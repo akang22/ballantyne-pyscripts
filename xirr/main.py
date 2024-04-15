@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import datetime
 import models
+import pathlib
 
 debug = print
 def expect(cond, message):
@@ -22,7 +23,7 @@ if __name__ == "__main__":
 
         })
 
-    data = pd.read_excel('test.xlsm', sheet_name=None)
+    data = pd.read_excel((pathlib.Path(__file__).parent / 'test.xlsm').resolve(), sheet_name=None)
 
     ret = {}
     

@@ -1,0 +1,6 @@
+.~lock.test.xlsm#
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+out.csv
