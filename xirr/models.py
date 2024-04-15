@@ -21,7 +21,6 @@ class Entry:
         return (self.date, (-1 if negative else 1) * self.amount)
 
 
-
 class EntryList:
     def __init__(self):
         self.list_map = []
@@ -29,12 +28,19 @@ class EntryList:
     def append(self, entry: Type[Entry]):
         bisect.insort_left(self.list_map, entry)
 
-    def get_list(self, latest_date, datetransform):
+    def get_list(self, datetransform):
         x, y = (
-            max(bisect.bisect_left(self.list_map, Entry(0, datetransform(latest_date)) - 1, 0),
-            bisect.bisect_right(self.list_map, Entry(0, latest_date)) + 1,
+            bisect.bisect_left(
+                self.list_map, Entry(0, datetransform(self.list_map[-1].date))
+            ),
+            bisect.bisect_right(self.list_map, Entry(0, self.list_map[-1].date)) + 1,
         )
         return self.list_map[x:y]
+
+    def get_days_delta(self, datetransform):
+        print(self.list_map[-1].date)
+        print(datetransform(self.list_map[-1].date))
+        return (self.list_map[-1].date - datetransform(self.list_map[-1].date)).days
 
 
 class Config:
@@ -46,9 +52,8 @@ class Config:
 
     def compute_XIRR_table(self, entries: Type[EntryList]):
         ret_obj = {}
-        latest_date = entries[-1].date
         for (name, datetransform) in self.config_map.items():
-            arr = entries.get_list(latest_date, datetransform)
+            arr = entries.get_list(datetransform)
             new_arr = (
                 []
                 if len(arr) < 2
@@ -57,6 +62,6 @@ class Config:
                 + [arr[-1].split(negative=True)]
             )
             ret_obj[name] = (xirr(new_arr) + 1) ** (
-                min(1, (daterange.end - daterange.start).days / 365)
+                min(1, entries.get_days_delta(datetransform) / 365)
             ) - 1
         return ret_obj
