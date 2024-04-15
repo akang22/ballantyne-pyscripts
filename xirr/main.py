@@ -89,4 +89,5 @@ if __name__ == "__main__":
             data={k: list(v.values()) for k, v in ret.items()}, index=config.get_keys()
         )
     ).transpose()
-    ret_df.to_csv("output.csv")
+    ret_df_percent = (ret_df * 100).round(2).map(lambda x: f"{x}%")
+    ret_df_percent.to_csv("output.csv")
