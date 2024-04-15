@@ -38,8 +38,6 @@ class EntryList:
         return self.list_map[x:y]
 
     def get_days_delta(self, datetransform):
-        print(self.list_map[-1].date)
-        print(datetransform(self.list_map[-1].date))
         return (self.list_map[-1].date - datetransform(self.list_map[-1].date)).days
 
 

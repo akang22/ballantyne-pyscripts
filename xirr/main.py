@@ -5,12 +5,12 @@ import models
 import pathlib
 import dateutil
 
-debug = print
+debug = lambda x : x 
 
 
 def expect(cond, message):
     if not cond:
-        debug(message)
+        print(message)
         exit()
 
 
@@ -91,3 +91,4 @@ if __name__ == "__main__":
     ).transpose()
     ret_df_percent = (ret_df * 100).round(2).map(lambda x: f"{x}%")
     ret_df_percent.to_csv("output.csv")
+    print("Output saved to output.csv")
