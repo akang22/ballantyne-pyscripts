@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pyxirr import xirr
 from typing import Type
+import dateutil
 
 
 @dataclass
@@ -20,11 +21,6 @@ class Entry:
         return (self.date, (-1 if negative else 1) * self.amount)
 
 
-@dataclass
-class DateRange:
-    start: datetime.date
-    end: datetime.date
-
 
 class EntryList:
     def __init__(self):
@@ -33,11 +29,10 @@ class EntryList:
     def append(self, entry: Type[Entry]):
         bisect.insort_left(self.list_map, entry)
 
-    def get_list(self, daterange: Type[DateRange]):
-        print(daterange)
+    def get_list(self, latest_date, datetransform):
         x, y = (
-            max(bisect.bisect_left(self.list_map, Entry(0, daterange.start)) - 1, 0),
-            bisect.bisect_right(self.list_map, Entry(0, daterange.end)) + 1,
+            max(bisect.bisect_left(self.list_map, Entry(0, datetransform(latest_date)) - 1, 0),
+            bisect.bisect_right(self.list_map, Entry(0, latest_date)) + 1,
         )
         return self.list_map[x:y]
 
@@ -51,8 +46,9 @@ class Config:
 
     def compute_XIRR_table(self, entries: Type[EntryList]):
         ret_obj = {}
-        for (name, daterange) in self.config_map.items():
-            arr = entries.get_list(daterange)
+        latest_date = entries[-1].date
+        for (name, datetransform) in self.config_map.items():
+            arr = entries.get_list(latest_date, datetransform)
             new_arr = (
                 []
                 if len(arr) < 2

@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import models
 import pathlib
+import dateutil
 
 debug = print
 def expect(cond, message):
@@ -13,14 +14,13 @@ def expect(cond, message):
 if __name__ == "__main__":
     # todo: make this based off a single date
     config = models.Config({
-        "QD": models.DateRange(datetime.date(2024, 1, 1), datetime.date(2024, 3, 31)),
-        "YD": models.DateRange(datetime.date(2024, 1, 1), datetime.date(2024, 3, 31)),
-        "XIRR-1": models.DateRange(datetime.date(2023, 4, 1), datetime.date(2024, 3, 31)),
-        "XIRR-3": models.DateRange(datetime.date(2021, 4, 1), datetime.date(2024, 3, 31)),
-        "XIRR-5": models.DateRange(datetime.date(2019, 4, 1), datetime.date(2024, 3, 31)),
-        "XIRR-10": models.DateRange(datetime.date(2018, 10, 1), datetime.date(2024, 3, 31)),
-        "XIRR-INC": models.DateRange(datetime.date(2018, 10, 1), datetime.date(2024, 3, 31))
-
+        "QD": lambda d: d.replace(month=(((d.month - 1) // 3) * 3 + 1), days=1),
+        "YD": lambda d: d.replace(month=1, days=1),
+        "XIRR-1": lambda d: d + dateutil.relativedelta.relativedelta(years-=1),
+        "XIRR-3": lambda d: d + dateutil.relativedelta.relativedelta(years-=3),
+        "XIRR-5": lambda d: d + dateutil.relativedelta.relativedelta(years-=5),
+        "XIRR-10": lambda d: d + dateutil.relativedelta.relativedelta(years-=10),
+        "XIRR-INC": lambda d: d + dateutil.relativedelta.relativedelta(years-=10000),
         })
 
     data = pd.read_excel((pathlib.Path(__file__).parent / 'test.xlsm').resolve(), sheet_name=None)
