@@ -55,5 +55,5 @@ if __name__ == "__main__":
 
             ret[name] = config.compute_XIRR_table(entry_list)
 
-    ret_df = pd.DataFrame(data={k : list(v.values()) for k, v in ret.items()}, index=config.get_keys())
-    ret_df.to_csv('out.csv')
+    ret_df = (pd.DataFrame(data={k : list(v.values()) for k, v in ret.items()}, index=config.get_keys())).transpose()
+    ret_df.to_csv('output.csv')
