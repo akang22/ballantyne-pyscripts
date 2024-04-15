@@ -23,6 +23,8 @@ if __name__ == "__main__":
         })
 
     data = pd.read_excel('test.xlsm', sheet_name=None)
+
+    ret = {}
     
     for df in data.values():
         for x, y in zip(*np.where(df.values == 'test_token')):
@@ -30,6 +32,7 @@ if __name__ == "__main__":
             expect(df.iat[x + 1, y] == 'name:', f"Expected \"name:\" at cell {x+ 1, y}, found {df.iat[x + 1, y]}")
             expect(isinstance(df.iat[x+1, y+1], str), f"Expected string at cell {x + 1, y+1}, found {df.iat[x + 1, y+1]}")
             name = df.iat[x + 1, y + 1]
+            expect(name not in ret, f"Found name {name} already in ret. Since this will override the previous value, have each name be unique.")
             expect(df.iat[x + 2, y] == 'amounts:', f"Expected \"amounts:\" at cell {x, y+1}, found {df.iat[x + 2, y]}")
             i = 3
             entry_list = models.EntryList()
@@ -49,5 +52,7 @@ if __name__ == "__main__":
 
             # print(repr(entry_list.listMap))
 
-            print(name)
-            print(config.compute_XIRR_table(entry_list))
+            ret[name] = config.compute_XIRR_table(entry_list)
+
+    ret_df = pd.DataFrame(data={k : list(v.values()) for k, v in ret.items()}, index=config.get_keys())
+    ret_df.to_csv('out.csv')

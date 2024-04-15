@@ -28,27 +28,30 @@ class DateRange:
 
 class EntryList:
     def __init__(self):
-        self.listMap = []
+        self.list_map = []
 
     def append(self, entry: Type[Entry]):
-        bisect.insort_left(self.listMap, entry)
+        bisect.insort_left(self.list_map, entry)
 
     def get_list(self, daterange: Type[DateRange]):
         print(daterange)
         x, y = (
-            max(bisect.bisect_left(self.listMap, Entry(0, daterange.start)) - 1, 0),
-            bisect.bisect_right(self.listMap, Entry(0, daterange.end)) + 1,
+            max(bisect.bisect_left(self.list_map, Entry(0, daterange.start)) - 1, 0),
+            bisect.bisect_right(self.list_map, Entry(0, daterange.end)) + 1,
         )
-        return self.listMap[x:y]
+        return self.list_map[x:y]
 
 
 class Config:
-    def __init__(self, configMap):
-        self.configMap = configMap
+    def __init__(self, config_map):
+        self.config_map = config_map
+
+    def get_keys(self):
+        return self.config_map.keys()
 
     def compute_XIRR_table(self, entries: Type[EntryList]):
         ret_obj = {}
-        for (name, daterange) in self.configMap.items():
+        for (name, daterange) in self.config_map.items():
             arr = entries.get_list(daterange)
             new_arr = (
                 []
