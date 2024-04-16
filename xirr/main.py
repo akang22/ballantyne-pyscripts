@@ -5,13 +5,19 @@ import models
 import pathlib
 import dateutil
 
-debug = lambda x : x 
+debug = lambda x: x
 
 
 def expect(cond, message):
     if not cond:
         print(message)
         exit()
+
+
+def get_monthend_date(date):
+    return (date + dateutil.relativedelta.relativedelta(months=1)).replace(
+        day=1
+    ) + dateutil.relativedelta.relativedelta(days=-1)
 
 
 if __name__ == "__main__":
@@ -35,6 +41,7 @@ if __name__ == "__main__":
     )
 
     ret = {}
+
 
     for df in data.values():
         for x, y in zip(*np.where(df.values == "test_token")):
@@ -68,11 +75,11 @@ if __name__ == "__main__":
                 )
                 try:
                     if isinstance(date, datetime.datetime):
-                        entry_list.append(models.Entry(val, date.date()))
+                        entry_list.append(models.Entry(val, get_monthend_date(date.date())))
                     else:
                         entry_list.append(
                             models.Entry(
-                                val, datetime.strptime(date, "%d-%m-%Y").date()
+                                val, get_monthend_date(datetime.strptime(date, "%d-%m-%Y").date())
                             )
                         )
                 except:
