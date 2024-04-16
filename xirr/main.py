@@ -42,7 +42,6 @@ if __name__ == "__main__":
 
     ret = {}
 
-
     for df in data.values():
         for x, y in zip(*np.where(df.values == "test_token")):
             debug(f"Found token at coordinates {(x, y)} on sheet {df}, parsing.")
@@ -69,25 +68,25 @@ if __name__ == "__main__":
             while df.iat[x + i, y] != "end":
                 val = df.iat[x + i, y]
                 date = df.iat[x + i, y + 1]
+                parsed_date = None
                 expect(
                     isinstance(val, (int, float)),
                     f"Expected cell {x + i, y} to contain a number, found {df.iat[x + i, y]}",
                 )
                 try:
                     if isinstance(date, datetime.datetime):
-                        entry_list.append(models.Entry(val, get_monthend_date(date.date())))
+                        parsed_date = date.date() 
                     else:
-                        entry_list.append(
-                            models.Entry(
-                                val, get_monthend_date(datetime.strptime(date, "%d-%m-%Y").date())
-                            )
-                        )
+                        parsed_date = datetime.strptime(date, "%d-%m-%Y").date()
                 except:
                     expect(
                         False,
                         f"Expected cell {x + i, y+ 1} to contain a date, found {df.iat[x + i, y + 1]}",
                     )
                 i += 1
+                if parsed_date.month not in [3, 6, 9, 12]:
+                    continue
+                entry_list.append(models.Entry(val, get_monthend_date(parsed_date)))
 
             ret[name] = config.compute_XIRR_table(entry_list)
 
@@ -99,3 +98,4 @@ if __name__ == "__main__":
     ret_df_percent = (ret_df * 100).round(2).map(lambda x: f"{x}%")
     ret_df_percent.to_csv("output.csv")
     print("Output saved to output.csv")
+
