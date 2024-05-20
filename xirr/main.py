@@ -9,6 +9,8 @@ import pyxirr
 import models
 
 
+# periodenddate same for all accounts, date used to calculate
+# TODO :add portcode
 def expect(cond, message):
     if not cond:
         print(message)
@@ -65,13 +67,17 @@ if __name__ == "__main__":
         parse_dates=["TRADDATE"],
     )
     month_end = pd.read_csv(
-        pathlib.Path(__file__).parent / "data" / "MonthEndMVs.csv",
+        pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv",
         parse_dates=["as_of_date"],
     )
     starting = pd.read_csv(
-        pathlib.Path(__file__).parent / "data" / "StartingMVs.csv",
+        pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv",
         parse_dates=["STARTMV_DATE"],
     )
+    starting["PortCode"] = starting["PortCode"].str.strip()
+    cashflows["PortCode"] = cashflows["PortCode"].str.strip()
+    cashflows["TRANTYPE"] = cashflows["TRANTYPE"].str.strip()
+    month_end["PortCode"] = month_end["PortCode"].str.strip()
 
     counts = starting["PortCode"].value_counts()
 
@@ -120,7 +126,7 @@ if __name__ == "__main__":
         aend["Type"] = 2
         astart = astart[["Date", "Value"]]
         aend["Type"] = 0
-
+        
         vals = (
             pd.concat(
                 [
@@ -139,26 +145,33 @@ if __name__ == "__main__":
             .reset_index(drop=True)
         )
 
-        #todo: redo this
+        # TODO: redo this
         # there arel ikely small bugs with cashflows on same day
 
         acc_dict = {}
         for name, get_bounds in config.items():
+            if aend.empty:
+                acc_dict[name] = None
+                continue
+
             start_date, end_date = get_bounds((astart["Date"].min(), final_date))
             if astart["Date"].min() <= start_date and end_date <= final_date:
                 first_index = vals[start_date <= vals["Date"]].index[0]
                 last_index = vals[vals["Date"] <= end_date].index[-1]
-                acc_dict[name] = (
-                    pyxirr.xirr(
-                        vals[
-                            (start_date <= vals["Date"])
-                            & (vals["Date"] <= end_date)
-                            & ((vals.index != first_index) | (vals["Value"] >= 0))
-                            & ((vals.index != last_index) | (vals["Value"] <= 0))
-                        ]
-                    )
-                    + 1
-                ) ** (min(1, (end_date - start_date).days / 365)) - 1
+                try:
+                     acc_dict[name] = (
+                         pyxirr.xirr(
+                             vals[
+                                 (start_date <= vals["Date"])
+                                 & (vals["Date"] <= end_date)
+                                 & ((vals.index != first_index) | (vals["Value"] >= 0))
+                                 & ((vals.index != last_index) | (vals["Value"] <= 0))
+                             ]
+                         )
+                         + 1
+                     ) ** (min(1, (end_date - start_date).days / 365)) - 1
+                except: 
+                    acc_dict[name] = None
             else: 
                 acc_dict[name] = None
 
@@ -170,7 +183,6 @@ if __name__ == "__main__":
             index=config.keys()
         )
     ).transpose()
-    # todo: fix formatting
-    ret_df_percent = (ret_df * 100).round(2).map(lambda x: f"{x}%")
+    ret_df_percent = ret_df.round(4)
     ret_df_percent.to_csv("output.csv")
     print("Output saved to output.csv")
