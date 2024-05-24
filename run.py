@@ -26,7 +26,7 @@ if __name__ == '__main__':
     
     def get_script_path(name):
         if platform.system() == 'Windows':
-            return f".\\venv\\Scripts\\{name}.bat"
+            return f".\\venv\\Scripts\\{name}.exe"
         else:
             return f"./venv/bin/{name}"
     
