@@ -12,7 +12,7 @@ if __name__ == '__main__':
     def run(command):
         if not iswin:
             command = shlex.split(command)
-        subprocess.run(command, stdout=subprocess.DEVNULL)
+        subprocess.run(command, stderr=f, stdout=subprocess.DEVNULL)
 
     def run_async(command):
         if not iswin:
