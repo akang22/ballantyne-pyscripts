@@ -17,7 +17,7 @@ def from_xml(link):
             try:
                 response = requests.get(link).content
             except:
-                print("hi")
+                print('network failed')
                 # TODO network failure handling, including retries
 
             xml = xmltodict.parse(response)
@@ -40,21 +40,11 @@ def get_corrupt_foreign_officials(xml):
     # some birth date available
     def split_name(name):
         return re.split(" \\(", name)[0]
-        if re.search("\\(born on ", name) is not None:
-            arr = re.split("\\(born on ", name)
-            return (arr[0], arr[1][:-1])
-
-        if re.search("\\(born in ", name) is not None:
-            arr = re.split("\\(born in ", name)
-            return (arr[0], arr[1][:-1])
-        return (name, None)
 
     names = [
         split_name(item["Text"])
         for item in xml["Regulation"]["Schedule"][0]["List"]["Item"]
     ]
-
-    # TODO: convert to dataframes/sql
 
     return names
 
@@ -94,11 +84,10 @@ def get_ukraine_exposed(xml):
 
     return names
 
-
 @from_xml(
     "https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml"
 )
-def get_consolidated_sanctions(xml):
+def get_consolidated_sanctions_names(xml):
     # can have DOB, regulation, Entity
     # missing 3 values
     def split_name(line):
@@ -106,29 +95,37 @@ def get_consolidated_sanctions(xml):
             (
                 [f"{line['GivenName'] } {line['LastName'].upper()}"]
                 if "GivenName" in line and "LastName" in line
-                else [line["Entity"]]
-                if "Entity" in line
                 else []
             )
-            + re.split(", (\\w+:)?", line["Aliases"])
-            if "Aliases" in line
-            else []
         )
-        # TODO: or and / splits as well
-        # eg. Nikolay or Nikolai / Vasilievich or Vasilyevich Maximavich or Maksimavich or Maximovich or Maksimovich
-
     names = [name for item in xml["data-set"]["record"] for name in split_name(item)]
 
     return names
 
+@from_xml(
+    "https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml"
+)
+def get_consolidated_sanctions_entities(xml):
+    # can have DOB, regulation, Entity
+    # missing 3 values
+    def split_name(line):
+        return (
+            (
+                [line["Entity"]]
+                if "Entity" in line
+                else []
+            )
+        )
+    names = [name for item in xml["data-set"]["record"] for name in split_name(item)]
+
+    return names
 
 @from_xml("https://laws-lois.justice.gc.ca/eng/XML/SOR-2001-360.xml")
 def get_terrorism_groups_UN(xml):
     def split_name(line):
         # TODO: only gets one name rn from the 'other names'
         return [
-            re.split("(( \\()|(\\))|(,))", name)[0]
-            for name in re.split(" \\(also known among other names as ", line)
+            re.split(" \\(also known among other names as ", line)[0]
         ]
 
     names = [

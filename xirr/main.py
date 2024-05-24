@@ -22,8 +22,23 @@ def get_monthend_date(date):
         day=1
     ) + dateutil.relativedelta.relativedelta(days=-1)
 
+def main_func(cashflow_file, monthend_file, starting_file):
+    cashflows = pd.read_csv(
+        cashflow_file,
+        parse_dates=["TRADDATE"],
+    )
+    month_end = pd.read_csv(
+        monthend_file,
+        parse_dates=["as_of_date"],
+    )
+    starting = pd.read_csv(
+        starting_file,
+        parse_dates=["STARTMV_DATE"],
+    )
+    return main_func_pds(cashflows, month_end, starting)
 
-if __name__ == "__main__":
+# TODO: add other options like dates
+def main_func_pds(cashflows, month_end, starting):
     custom_intervals = pd.read_csv(
         pathlib.Path(__file__).parent / "settings" / "intervals.csv",
         parse_dates=["StartDate", "EndDate"],
@@ -62,22 +77,14 @@ if __name__ == "__main__":
         },
     }
 
-    cashflows = pd.read_csv(
-        pathlib.Path(__file__).parent / "data" / "CashFlows.csv",
-        parse_dates=["TRADDATE"],
-    )
-    month_end = pd.read_csv(
-        pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv",
-        parse_dates=["as_of_date"],
-    )
-    starting = pd.read_csv(
-        pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv",
-        parse_dates=["STARTMV_DATE"],
-    )
-    starting["PortCode"] = starting["PortCode"].str.strip()
-    cashflows["PortCode"] = cashflows["PortCode"].str.strip()
-    cashflows["TRANTYPE"] = cashflows["TRANTYPE"].str.strip()
-    month_end["PortCode"] = month_end["PortCode"].str.strip()
+    if "str" in starting["PortCode"]:
+        starting["PortCode"] = starting["PortCode"].str.strip()
+    if "str" in cashflows["PortCode"]:
+        cashflows["PortCode"] = cashflows["PortCode"].str.strip()
+    if "str" in cashflows["TRANTYPE"]:
+        cashflows["TRANTYPE"] = cashflows["TRANTYPE"].str.strip()
+    if "str" in month_end["PortCode"]:
+        month_end["PortCode"] = month_end["PortCode"].str.strip()
 
     counts = starting["PortCode"].value_counts()
 
@@ -184,5 +191,12 @@ if __name__ == "__main__":
         )
     ).transpose()
     ret_df_percent = ret_df.round(4)
+    return ret_df_percent
+
+if __name__ == "__main__":
+    # TODO do cli shit
+    # TODO more testing
+    ret_df = main_func(pathlib.Path(__file__).parent / "data" / "CashFlows.csv", pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv", pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv")
     ret_df_percent.to_csv("output.csv")
     print("Output saved to output.csv")
+
