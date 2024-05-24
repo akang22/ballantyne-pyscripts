@@ -10,10 +10,14 @@ if __name__ == '__main__':
     iswin = platform.system() == 'Windows'
     f = open("log.txt", "a")
     def run(command):
-        subprocess.run(shlex.split(command), stdout=subprocess.DEVNULL)
+        if !iswin:
+            command = shlex.split(command)
+        subprocess.run(command, stdout=subprocess.DEVNULL)
 
     def run_async(command):
-        df = subprocess.Popen(shlex.split(command), stderr=f, stdout=subprocess.DEVNULL)
+        if !iswin:
+            command = shlex.split(command)
+        df = subprocess.Popen(command, stderr=f, stdout=subprocess.DEVNULL)
     print("Updating codebase...")
     run("git pull")
     print("Pulling dependencies...")
