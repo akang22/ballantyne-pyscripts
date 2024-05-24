@@ -5,16 +5,18 @@ import shlex
 
 
 
-def run(command):
-    subprocess.run(shlex.split(command))
-
-def run_async(command, file):
-    df = subprocess.Popen(shlex.split(command), stderr=file)
 
 if __name__ == '__main__':
     iswin = platform.system() == 'Windows'
-    f = open("log.txt", "a"):
+    f = open("log.txt", "a")
+    def run(command):
+        subprocess.run(shlex.split(command), stdout=subprocess.DEVNULL)
+
+    def run_async(command):
+        df = subprocess.Popen(shlex.split(command), stderr=f, stdout=subprocess.DEVNULL)
+    print("Updating codebase...")
     run("git pull")
+    print("Pulling dependencies...")
     
     run("python3 -m venv venv")
     
@@ -29,15 +31,12 @@ if __name__ == '__main__':
             return f"./venv/bin/{name}"
     
     run(f"{get_script_path('pip')} install -r requirements.txt")
+
+    print("Running GUIs...")
     
-    run_async(f"{get_script_path('streamlit')} run xirr{slash}gui.py", f)
+    run_async(f"{get_script_path('streamlit')} run xirr{slash}gui.py")
 
-    run_async(f"{get_script_path('streamlit')} run aml{slash}gui.py", f)
+    run_async(f"{get_script_path('streamlit')} run aml{slash}gui.py")
 
-    a = 0
-
-    while True:
-        time.sleep(100)
-
-    
+    print("Finished!")
 

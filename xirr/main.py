@@ -22,7 +22,7 @@ def get_monthend_date(date):
         day=1
     ) + dateutil.relativedelta.relativedelta(days=-1)
 
-def main_func(cashflow_file, monthend_file, starting_file):
+def main_func(cashflow_file, monthend_file, starting_file, return_interim=False):
     cashflows = pd.read_csv(
         cashflow_file,
         parse_dates=["TRADDATE"],
@@ -35,10 +35,10 @@ def main_func(cashflow_file, monthend_file, starting_file):
         starting_file,
         parse_dates=["STARTMV_DATE"],
     )
-    return main_func_pds(cashflows, month_end, starting)
+    return main_func_pds(cashflows, month_end, starting, return_interim=return_interim)
 
 # TODO: add other options like dates
-def main_func_pds(cashflows, month_end, starting):
+def main_func_pds(cashflows, month_end, starting, return_interim=False):
     custom_intervals = pd.read_csv(
         pathlib.Path(__file__).parent / "settings" / "intervals.csv",
         parse_dates=["StartDate", "EndDate"],
@@ -191,6 +191,8 @@ def main_func_pds(cashflows, month_end, starting):
         )
     ).transpose()
     ret_df_percent = ret_df.round(4)
+    if return_interim:
+        return ret_df_percent, vals
     return ret_df_percent
 
 if __name__ == "__main__":
