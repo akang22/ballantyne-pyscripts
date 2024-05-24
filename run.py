@@ -2,6 +2,7 @@ import subprocess
 import os
 import platform
 import shlex
+import time
 
 
 
@@ -45,5 +46,5 @@ if __name__ == '__main__':
     print("Web servers are running!")
 
     while True:
-        sleep(30)
+        time.sleep(100)
 

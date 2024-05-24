@@ -15,4 +15,6 @@ for i, tab in enumerate(tabs[:-1]):
         tab.header("Final Result")
         tab.table(res_data_frame)
         tab.header("Interim Results")
-        tab.table(interim)
+        for account, df in interim.items():
+            tab.subheader(f"{account}")
+            tab.table(df)

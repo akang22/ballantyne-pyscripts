@@ -77,14 +77,10 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         },
     }
 
-    if "str" in starting["PortCode"]:
-        starting["PortCode"] = starting["PortCode"].str.strip()
-    if "str" in cashflows["PortCode"]:
-        cashflows["PortCode"] = cashflows["PortCode"].str.strip()
-    if "str" in cashflows["TRANTYPE"]:
-        cashflows["TRANTYPE"] = cashflows["TRANTYPE"].str.strip()
-    if "str" in month_end["PortCode"]:
-        month_end["PortCode"] = month_end["PortCode"].str.strip()
+    starting["PortCode"] = starting["PortCode"].astype('str').str.strip()
+    cashflows["PortCode"] = cashflows["PortCode"].astype('str').str.strip()
+    cashflows["TRANTYPE"] = cashflows["TRANTYPE"].astype('str').str.strip()
+    month_end["PortCode"] = month_end["PortCode"].astype('str').str.strip()
 
     counts = starting["PortCode"].value_counts()
 
@@ -93,6 +89,7 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         f"Expected 'PortCode' in startingMVs to be unique. However, port codes {', '.join([str(a) for a in counts[counts > 1].index.values])} are repeated.",
     )
 
+    val_dict = {}
     ret = {}
 
     for account in starting["PortCode"]:
@@ -184,6 +181,8 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
 
         ret[account] = acc_dict
 
+        val_dict[account] = vals
+
     ret_df = (
         pd.DataFrame(
             data={k: list(v.values()) for k, v in ret.items()}, 
@@ -192,7 +191,7 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
     ).transpose()
     ret_df_percent = ret_df.round(4)
     if return_interim:
-        return ret_df_percent, vals
+        return ret_df_percent, val_dict
     return ret_df_percent
 
 if __name__ == "__main__":
