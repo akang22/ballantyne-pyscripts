@@ -42,5 +42,8 @@ if __name__ == '__main__':
 
     run_async(f"{get_script_path('streamlit')} run aml{slash}gui.py")
 
-    print("Finished!")
+    print("Web servers are running!")
+
+    while True:
+        sleep(30)
 
