@@ -25,8 +25,6 @@ if __name__ == '__main__':
     
     run("python3 -m venv venv")
     
-    run("python -m venv venv")
-
     slash = '\\' if iswin else "/"
     
     def get_script_path(name):
