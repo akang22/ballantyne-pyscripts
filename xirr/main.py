@@ -6,11 +6,7 @@ import numpy as np
 import pandas as pd
 import pyxirr
 
-import models
 
-
-# periodenddate same for all accounts, date used to calculate
-# TODO :add portcode
 def expect(cond, message):
     if not cond:
         print(message)
@@ -129,7 +125,7 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         aend = aend[["Date", "Value"]]
         aend["Type"] = 2
         astart = astart[["Date", "Value"]]
-        aend["Type"] = 0
+        astart["Type"] = 0
         
         vals = (
             pd.concat(
@@ -198,6 +194,6 @@ if __name__ == "__main__":
     # TODO do cli shit
     # TODO more testing
     ret_df = main_func(pathlib.Path(__file__).parent / "data" / "CashFlows.csv", pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv", pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv")
-    ret_df_percent.to_csv("output.csv")
+    ret_df.to_csv("output.csv")
     print("Output saved to output.csv")
 
