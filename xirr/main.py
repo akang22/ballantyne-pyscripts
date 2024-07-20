@@ -18,6 +18,7 @@ def get_monthend_date(date):
         day=1
     ) + dateutil.relativedelta.relativedelta(days=-1)
 
+
 def main_func(cashflow_file, monthend_file, starting_file, return_interim=False):
     cashflows = pd.read_csv(
         cashflow_file,
@@ -32,6 +33,7 @@ def main_func(cashflow_file, monthend_file, starting_file, return_interim=False)
         parse_dates=["STARTMV_DATE"],
     )
     return main_func_pds(cashflows, month_end, starting, return_interim=return_interim)
+
 
 # TODO: add other options like dates
 def main_func_pds(cashflows, month_end, starting, return_interim=False):
@@ -73,10 +75,10 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         },
     }
 
-    starting["PortCode"] = starting["PortCode"].astype('str').str.strip()
-    cashflows["PortCode"] = cashflows["PortCode"].astype('str').str.strip()
-    cashflows["TRANTYPE"] = cashflows["TRANTYPE"].astype('str').str.strip()
-    month_end["PortCode"] = month_end["PortCode"].astype('str').str.strip()
+    starting["PortCode"] = starting["PortCode"].astype("str").str.strip()
+    cashflows["PortCode"] = cashflows["PortCode"].astype("str").str.strip()
+    cashflows["TRANTYPE"] = cashflows["TRANTYPE"].astype("str").str.strip()
+    month_end["PortCode"] = month_end["PortCode"].astype("str").str.strip()
 
     counts = starting["PortCode"].value_counts()
 
@@ -126,12 +128,12 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         aend["Type"] = 2
         astart = astart[["Date", "Value"]]
         astart["Type"] = 0
-        
+
         vals = (
             pd.concat(
                 [
                     astart,
-                    aend[aend["Date"] != aend["Date"].max()],
+                    aend,
                     aend.apply(
                         lambda x: (x.iloc[0], -x.iloc[1], x.iloc[2]),
                         axis=1,
@@ -141,7 +143,6 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
                 ]
             )
             .sort_values(["Date", "Type", "Value"], axis="index")
-            .drop(["Type"], axis="columns")
             .reset_index(drop=True)
         )
 
@@ -156,23 +157,37 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
 
             start_date, end_date = get_bounds((astart["Date"].min(), final_date))
             if astart["Date"].min() <= start_date and end_date <= final_date:
-                first_index = vals[start_date <= vals["Date"]].index[0]
-                last_index = vals[vals["Date"] <= end_date].index[-1]
+                # get rid of the first negative monthend and last positive monthend.
+                index_or_neg1 = lambda x, y: x.index[y] if len(x.index) > 0 else -1
+                first_index = index_or_neg1(
+                    vals[
+                        (start_date == vals["Date"])
+                        & (vals["Value"] <= 0)
+                        & (vals["Type"] == 2)
+                    ],
+                    0,
+                )
+                last_index = index_or_neg1(
+                    vals[
+                        (vals["Date"] == end_date)
+                        & (vals["Value"] >= 0)
+                        & (vals["Type"] == 2)
+                    ],
+                    -1,
+                )
                 try:
-                     acc_dict[name] = (
-                         pyxirr.xirr(
-                             vals[
-                                 (start_date <= vals["Date"])
-                                 & (vals["Date"] <= end_date)
-                                 & ((vals.index != first_index) | (vals["Value"] >= 0))
-                                 & ((vals.index != last_index) | (vals["Value"] <= 0))
-                             ]
-                         )
-                         + 1
-                     ) ** (min(1, (end_date - start_date).days / 365)) - 1
-                except: 
+                    val = vals[
+                        (vals.index > first_index) & (vals.index < last_index)
+                    ].drop(["Type"], axis="columns")
+                    acc_dict[name] = round(
+                        (pyxirr.xirr(val) + 1)
+                        ** (min(1, (end_date - start_date).days / 365))
+                        - 1,
+                        4,
+                    )
+                except Exception:
                     acc_dict[name] = None
-            else: 
+            else:
                 acc_dict[name] = None
 
         ret[account] = acc_dict
@@ -181,19 +196,21 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
 
     ret_df = (
         pd.DataFrame(
-            data={k: list(v.values()) for k, v in ret.items()}, 
-            index=config.keys()
+            data={k: list(v.values()) for k, v in ret.items()}, index=config.keys()
         )
     ).transpose()
-    ret_df_percent = ret_df.round(4)
     if return_interim:
-        return ret_df_percent, val_dict
-    return ret_df_percent
+        return ret_df, val_dict
+    return ret_df
+
 
 if __name__ == "__main__":
     # TODO do cli shit
     # TODO more testing
-    ret_df = main_func(pathlib.Path(__file__).parent / "data" / "CashFlows.csv", pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv", pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv")
+    ret_df = main_func(
+        pathlib.Path(__file__).parent / "data" / "CashFlows.csv",
+        pathlib.Path(__file__).parent / "data" / "MonthEnd Market Values.csv",
+        pathlib.Path(__file__).parent / "data" / "Starting Market Values.csv",
+    )
     ret_df.to_csv("output.csv")
     print("Output saved to output.csv")
-
