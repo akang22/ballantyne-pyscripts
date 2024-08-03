@@ -6,3 +6,5 @@ __pycache__/
 out.csv
 log.txt
 xirr/data
+.env
+log.txt
