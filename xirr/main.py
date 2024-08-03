@@ -1,8 +1,6 @@
-import datetime
 import pathlib
-
 import dateutil
-import numpy as np
+
 import pandas as pd
 import pyxirr
 
@@ -158,7 +156,9 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
             start_date, end_date = get_bounds((astart["Date"].min(), final_date))
             if astart["Date"].min() <= start_date and end_date <= final_date:
                 # get rid of the first negative monthend and last positive monthend.
-                index_or_neg1 = lambda x, y: x.index[y] if len(x.index) > 0 else -1
+                def index_or_neg1(x, y):
+                    return x.index[y] if len(x.index) > 0 else -1
+
                 first_index = index_or_neg1(
                     vals[
                         (start_date == vals["Date"])
