@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from main import main_func
+from xirr import main_func
 
 st.title("XIRR Applet")
 tabs = st.tabs(["CSV input", "Database Input (wip)", "Walkthrough (wip)"])

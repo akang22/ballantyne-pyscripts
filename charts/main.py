@@ -1,7 +1,6 @@
 import yfinance as yf
 import requests
 import json
-import matplotlib.pyplot as plt
 import numpy as np
 import datetime
 import pandas as pd
