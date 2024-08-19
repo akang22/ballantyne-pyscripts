@@ -1,14 +1,24 @@
 import streamlit
+import streamlit.runtime.scriptrunner.magic_funcs
 
-import streamlit.web.bootstrap as bootstrap 
+import streamlit.web.bootstrap
 import os, sys
-from pages import aml, xirr
-
-
-def resolve_path(path):
-    resolved_path = os.path.abspath(os.path.join(os.getcwd(), path))
-    return resolved_path
+from pages import aml, charts, xirr
 
 
 if __name__ == "__main__":
-    bootstrap.run("app.py", False, args=['run'], flag_options={})
+    flag_options = {
+        "server.port": 8501,
+        "global.developmentMode": False,
+    }
+
+    streamlit.web.bootstrap.load_config_options(flag_options=flag_options)
+    flag_options["_is_running_with_streamlit"] = True
+
+    streamlit.web.bootstrap.run(
+        "app.py",
+        False,
+        [],
+        flag_options,
+    )
+
