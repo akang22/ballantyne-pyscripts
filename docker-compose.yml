@@ -1,0 +1,9 @@
+services:
+  ballantynepyscripts:
+    container_name: ballantynepyscripts
+    image: akang22/ballantynepyscripts
+    ports:
+      - "8501:8501"
+    build:
+      context: .
+      dockerfile: Dockerfile

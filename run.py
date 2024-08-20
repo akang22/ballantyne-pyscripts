@@ -3,7 +3,8 @@ import streamlit.runtime.scriptrunner.magic_funcs
 
 import streamlit.web.bootstrap
 import os, sys
-from pages import aml, charts, xirr
+from pages import aml, xirr
+import app
 
 
 if __name__ == "__main__":
