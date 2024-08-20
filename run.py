@@ -1,46 +1,25 @@
-import subprocess
-import platform
-import shlex
-import time
+import streamlit
+import streamlit.runtime.scriptrunner.magic_funcs
+
+import streamlit.web.bootstrap
+import os, sys
+from pages import aml, xirr
+import app
 
 
 if __name__ == "__main__":
-    iswin = platform.system() == "Windows"
-    f = open("log.txt", "a")
+    flag_options = {
+        "server.port": 8501,
+        "global.developmentMode": False,
+    }
 
-    def run(command):
-        if not iswin:
-            command = shlex.split(command)
-        subprocess.run(command, stderr=f, stdout=subprocess.DEVNULL)
+    streamlit.web.bootstrap.load_config_options(flag_options=flag_options)
+    flag_options["_is_running_with_streamlit"] = True
 
-    def run_async(command):
-        if not iswin:
-            command = shlex.split(command)
-        subprocess.Popen(command, stderr=f, stdout=subprocess.DEVNULL)
+    streamlit.web.bootstrap.run(
+        "app.py",
+        False,
+        [],
+        flag_options,
+    )
 
-    print("Updating codebase...")
-    run("git pull")
-    print("Pulling dependencies...")
-
-    run("python3 -m venv venv")
-
-    slash = "\\" if iswin else "/"
-
-    def get_script_path(name):
-        if platform.system() == "Windows":
-            return f".\\venv\\Scripts\\{name}.exe"
-        else:
-            return f"./venv/bin/{name}"
-
-    run(f"{get_script_path('pip')} install -r requirements.txt")
-
-    print("Running GUIs...")
-
-    run_async(f"{get_script_path('streamlit')} run xirr{slash}gui.py")
-
-    run_async(f"{get_script_path('streamlit')} run aml{slash}gui.py")
-
-    print("Web servers are running!")
-
-    while True:
-        time.sleep(100)

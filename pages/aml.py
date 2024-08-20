@@ -4,7 +4,7 @@ import unidecode
 import codecs
 import csv
 
-import main
+import aml
 
 
 def unidecode_fallback(e):
@@ -23,10 +23,10 @@ def get_dfs():
         [
             f'"{a}"'
             for a in [
-                *main.get_corrupt_foreign_officials(),
-                *main.get_tunisia_exposed(),
-                *main.get_ukraine_exposed(),
-                *main.get_consolidated_sanctions_names(),
+                *aml.get_corrupt_foreign_officials(),
+                *aml.get_tunisia_exposed(),
+                *aml.get_ukraine_exposed(),
+                *aml.get_consolidated_sanctions_names(),
             ]
         ]
     ).rename(columns={0: "Individuals"})
@@ -34,9 +34,9 @@ def get_dfs():
         [
             f'"{a}"'
             for a in [
-                *main.get_consolidated_sanctions_entities(),
-                *main.get_terrorism_groups_UN(),
-                *main.get_list_of_entities_canada(),
+                *aml.get_consolidated_sanctions_entities(),
+                *aml.get_terrorism_groups_UN(),
+                *aml.get_list_of_entities_canada(),
             ]
         ]
     ).rename(columns={0: "Entities"})

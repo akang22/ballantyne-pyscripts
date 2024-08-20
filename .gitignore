@@ -8,3 +8,5 @@ log.txt
 xirr/data
 .env
 log.txt
+build/
+*.DS_Store
