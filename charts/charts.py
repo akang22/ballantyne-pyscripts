@@ -10,6 +10,8 @@ import finnhub
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
 
@@ -19,10 +21,14 @@ st.title("StockCharts")
 
 ticker_input = st.text_input("Ticker Value")
 
+def get_quarter_end_date(year, quarter):
+    month = 3 * ((quarter + 3) % 4) + 3
+    date_index = datetime.date(year, month, 28) + datetime.timedelta(days=4)
+    return date_index - datetime.timedelta(days=date_index.day)
+
+
 def flatten_report(report):
-    month = 3 * ((report["quarter"] + 3) % 4) + 3
-    date_index = datetime.date(report["year"], month, 28) + datetime.timedelta(days=4)
-    date_index = date_index - datetime.timedelta(days=date_index.day)
+    date_index = get_quarter_end_date(report["year"], report["quarter"])
 
     return {
         "index": date_index,
@@ -37,6 +43,14 @@ def flatten_report(report):
 finnhub_client = finnhub.Client(api_key=get_secret(ConfigKey.FINNHUB))
 SP500DATA = yf.Ticker("^GSPC")
 
+def verify_quarterly_data_irregularities(data, start_date):
+    data = data[data.index >= start_date]
+    if data.isna().any():
+        raise Exception("Requested data contains nans, {data}")
+    quarter_ends = pd.date_range(start=start_date, end=data.index[-1], freq='QE')
+    missing_quarter_ends = [date for date in quarter_ends if date not in data.index]
+    if len(missing_quarter_ends) > 0:
+        raise Exception("Requested data does not contain these monthend values: {missing_quarter_ends}, {data}")
 
 @st.cache_data
 def get_ticker_data(ticker, start_date):
@@ -60,10 +74,13 @@ def get_ticker_data(ticker, start_date):
         ]
     ).set_index("index")[::-1]
     finnhub_reported_data = pd.concat([data1, data2]).sort_index()
-    finnhub_reported_data.index = pd.to_datetime(finnhub_reported_data.index, utc=True)
+    finnhub_reported_data.index = pd.to_datetime(finnhub_reported_data.index, utc=True).date
 
     hprice = yahoo_finance_info.history(period="max", auto_adjust=False)["Open"]
+    hprice.index = pd.to_datetime(hprice.index).date
+
     SP500_hprice = SP500DATA.history(period="max", auto_adjust=False)["Open"]
+    SP500_hprice.index = pd.to_datetime(SP500_hprice.index).date
 
     mapping = collections.defaultdict(dict)
     for k, v in finnhub_data["series"]["quarterly"].items():
@@ -71,13 +88,13 @@ def get_ticker_data(ticker, start_date):
             mapping[i["period"]][k] = i["v"]
 
     quarterly_series = pd.DataFrame(mapping).transpose()
-    quarterly_series.index = pd.to_datetime(quarterly_series.index, utc=True)
+    quarterly_series.index = pd.to_datetime(quarterly_series.index).date
 
     price_to_book = quarterly_series["pb"]
     book_value = quarterly_series["bookValue"]
 
     q_mcap = (book_value.mul(price_to_book, fill_value=np.NaN) * (10**6))[::-1]
-    q_mcap.index = pd.to_datetime(q_mcap.index, utc=True)
+    q_mcap.index = pd.to_datetime(q_mcap.index).date
     q_mcap = q_mcap
 
     # so this may look stupid, multiply and divide by the same column, but this essentially is first dividing by
@@ -94,18 +111,17 @@ def get_ticker_data(ticker, start_date):
         ],
     )
 
-    dividends = nan_default_chain(
-        finnhub_reported_data,
-        ["us-gaap_PaymentsOfDividendsCommonStock", "PaymentsOfDividendsCommonStock", "us-gaap_PaymentsOfDividends", "PaymentsOfDividends"],
-        fill_zeros=True,
-        adjust=AdjustReported.ALLYTD
-    )
+    dividend_amount = yahoo_finance_info.dividends
+    dividend_amount.index = pd.to_datetime(dividend_amount.index).date
+
+    # sum dividends by quarter
+
 
     revenue = nan_default_chain(
             finnhub_reported_data,
             ["us-gaap_Revenues", "Revenues", "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax", "RevenueFromContractWithCustomerExcludingAssessedTax"],
             fill_zeros=True,
-            adjust=AdjustReported.ANNUALSYTD
+            adjust=AdjustReported.ALLYTD
     )
 
     q_ev = quarterly_series["ev"]
@@ -120,7 +136,7 @@ def get_ticker_data(ticker, start_date):
         "ticker_name": ticker,
         "start_date": start_date,
         "ev": ev,
-        "dividends": dividends,
+        "dividend_amount": dividend_amount,
         "revenue": revenue,
         "SP500_hprice": SP500_hprice,
         "quarterly_series": quarterly_series,
@@ -188,7 +204,7 @@ def get_graph1(*_, start_date, hprice, ticker_name, SP500_hprice, **rest):
     ).rename("SP 500")
 
     graph1 = pd.concat([SP500_return, price_return], axis=1)
-    graph1.index = pd.to_datetime(graph1.index, utc=True)
+    graph1.index = pd.to_datetime(graph1.index, utc=True).date
 
     return graph1
 
@@ -197,7 +213,7 @@ def get_graph1(*_, start_date, hprice, ticker_name, SP500_hprice, **rest):
 @st.cache_data
 def get_graph2(*_, quarterly_series, mcap, ev, **rest):
     graph2 = pd.concat([ev, mcap], keys=["Enterprise Value", "Market Cap"], axis=1)
-    graph2.index = pd.to_datetime(graph2.index, utc=True)
+    graph2.index = pd.to_datetime(graph2.index, utc=True).date
 
     return graph2
 
@@ -205,7 +221,7 @@ def get_graph2(*_, quarterly_series, mcap, ev, **rest):
 # graph3
 # For IBM, 10-k is missing in finnhub API, causing issues. However given finnhub is right this should be right
 @st.cache_data
-def get_graph3(*_, finnhub_reported_data, **rest):
+def get_graph3(*_, finnhub_reported_data, start_date, **rest):
     eps_diluted = nan_default_chain(
         finnhub_reported_data,
         [
@@ -217,6 +233,7 @@ def get_graph3(*_, finnhub_reported_data, **rest):
         fill_zeros=True,
         adjust=AdjustReported.ANNUALSYTD
     )
+    verify_quarterly_data_irregularities(eps_diluted, start_date.replace(year = start_date.year - 1)
     graph3 = eps_diluted.rolling(4).sum().to_frame()
 
     return graph3
@@ -224,12 +241,8 @@ def get_graph3(*_, finnhub_reported_data, **rest):
 
 # graph4
 @st.cache_data
-def get_graph4(*_, finnhub_reported_data, num_shares, dividends, **rest):
-    dividend_amount = piecewise_op_search(
-        dividends, num_shares, operator.truediv
-    )
-
-    dividend_ratios = dividend_amount.rolling(2).apply(lambda a: (a[1] - a[0]) / a[1] * 100)
+def get_graph4(*_, finnhub_reported_data, num_shares, dividend_amount, quarterly_series, start_date, **rest):
+    dividend_ratios = dividend_amount.rolling(4).sum().rolling(5).apply(lambda a: (a[4] - a[0]) / a[0] * 100)
 
     graph4 = pd.concat(
         [dividend_ratios, dividend_amount],
@@ -249,7 +262,11 @@ def get_graph5(*_, quarterly_series, mcap, **rest):
     price_to_sales = quarterly_series["psTTM"]
 
     graph5 = pd.concat([price_to_book, price_to_cashflow, price_to_sales], axis=1)[::-1]
-    graph5.index = pd.to_datetime(graph5.index, utc=True)
+    graph5.index = pd.to_datetime(graph5.index, utc=True).date
+
+    verify_quarterly_data_irregularities(price_to_book, start_date)
+    verify_quarterly_data_irregularities(price_to_cashflow, start_date)
+    verify_quarterly_data_irregularities(price_to_sales, start_date)
 
     # see above
     graph5 = piecewise_op_search(graph5, mcap, lambda df1, df2: df1.div(df2, axis=0))
@@ -262,6 +279,7 @@ def get_graph5(*_, quarterly_series, mcap, **rest):
 # ebit issue is issue with IBM
 @st.cache_data
 def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, num_shares, **rest):
+    verify_quarterly_data_irregularities(quarterly_series, start_date)
     ebit = piecewise_op_search(
             quarterly_series["ebitPerShare"][::-1],
         num_shares,
@@ -278,14 +296,13 @@ def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, num_shares, **re
 
 # graph7
 @st.cache_data
-def get_graph7(*_, finnhub_reported_data, hprice, ticker_name, dividends, start_date, num_shares, **rest):
+def get_graph7(*_, finnhub_reported_data, hprice, ticker_name, dividend_amount, start_date, num_shares, **rest):
     # todo: move into display logic?
     price_return = hprice.rename(ticker_name)[hprice.index >= start_date]
 
-    dividends_per_share = piecewise_op_search(num_shares, dividends, lambda a, b: b / a)
-    dividends_per_share.iloc[0] = 0
+    dividend_amount = dividend_amount[dividend_amount.index >= start_date]
 
-    total_return = piecewise_op_search(price_return, dividends_per_share, operator.add)
+    total_return = piecewise_op_search(price_return, dividend_amount.cumsum(), operator.add)
 
     price_return = (price_return / hprice[hprice.index.searchsorted(start_date)]) - 1
     total_return = (total_return / total_return.iloc[0]) - 1
@@ -311,6 +328,7 @@ def get_graph8(*_, finnhub_reported_data, quarterly_series, revenue, start_date,
 # graph9
 @st.cache_data
 def get_graph9(*_, quarterly_series, **rest):
+
     graph9 = pd.concat(
         [
             quarterly_series["roeTTM"],
@@ -328,7 +346,7 @@ def get_graph9(*_, quarterly_series, **rest):
 def get_graph10(*_, finnhub_reported_data, revenue, quarterly_series, **rest):
     revenue_ttm = revenue.rolling(4).sum()
 
-    graph10 = revenue_ttm.to_frame()
+    graph10 = pd.concat([revenue, revenue_ttm], keys=['revenue', 'revenue_ttm'], axis=1)
     return graph10
 
 
@@ -391,14 +409,13 @@ meta_info = [
     },
     {
         "title": "Market Cap, Enterprise Value",
-        "yaxis": "USD",
     },
     {
         "title": "EPS: Diluted Before Extra (TTM)",
         "show_legend": False,
     },
     {
-        "title": "1 Year Dividend Growth Rate",
+        "title": "1 Year Dividend Growth Rate, Dividend Amount",
     },
     {
         "title": "Price / Book, Price / Cash Flow (TTM), Price / Sales (TTM)",
@@ -423,7 +440,6 @@ meta_info = [
     },
     {
         "title": "Diluted Weighted Average Shares Outstanding (TTM)",
-        "yaxis": "# shares",
         "show_legend": False,
     },
     {
@@ -431,7 +447,7 @@ meta_info = [
     },
 ]
 
-ticker_vals = [val.strip() for val in ticker_input.split(",") if val.strip() != ""]
+ticker_vals = [val.strip().upper() for val in ticker_input.split(",") if val.strip() != ""]
 
 if len(ticker_vals) > 0:
     tabs = st.tabs(ticker_vals)
@@ -441,9 +457,7 @@ else:
 
 for ticker, tab in zip(ticker_vals, tabs):
     try:
-        start_date = datetime.datetime(2021, 8, 22).replace(
-            tzinfo=datetime.timezone.utc
-        )
+        start_date = datetime.date(2021, 8, 22)
         ticker_data = get_ticker_data(ticker, start_date)
     except Exception as e:
         tab.error(
@@ -456,23 +470,27 @@ for ticker, tab in zip(ticker_vals, tabs):
         try:
             graph = func(**ticker_data)
             graph = graph[graph.index >= start_date]
+            
+            fig = go.Figure()
+            layoutupdate = {}
+            for i, col in enumerate(graph):
+                label = str(i + 1) if i != 0 else ""
+                fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=col,yaxis=f"y{label}"))
+                layoutupdate[f"yaxis{label}"] = dict(title=col, autoshift=True, title_standoff=5, shift=-10, anchor="free", overlaying="y")
+                if "ypercent" in data:
+                    layoutupdate[f"yaxis{label}"]["tickformat"] =".2%"
 
-            fig = px.line(graph, title=(f"{ticker}: {data['title']}"))
-            fig.update_layout(xaxis_title="Date")
+            del layoutupdate['yaxis']['overlaying']
+            del layoutupdate['yaxis']['anchor']
+
+            fig.update_layout(**layoutupdate, title=f"{ticker}: {data['title']}", xaxis_title="Date", margin_l = 80 + 20*i)
+
             if "show_legend" in data:
                 fig.update_layout(showlegend=data["show_legend"])
                 fig.update_layout({"legend_title_text": "Legend"})
-            if "ypercent" in data:
-                fig.update_layout(yaxis_tickformat=".2%")
-            if "yaxis" in data:
-                fig.update_layout(yaxis_title=data["yaxis"])
-            else:
-                fig.update_layout(yaxis_title="")
-            tab.plotly_chart(fig)
+            tab.plotly_chart(fig, use_container_width=True)
 
         except Exception as e:
-            tab.error(
-                f"Data could not be fetched. Double check the ticker {ticker} is correct."
-            )
+            tab.text(f"Graph {data['title']} could not be shown due to the following error:")
             tab.exception(e)
             continue
