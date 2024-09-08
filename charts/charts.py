@@ -45,12 +45,18 @@ SP500DATA = yf.Ticker("^GSPC")
 
 def verify_quarterly_data_irregularities(data, start_date):
     data = data[data.index >= start_date]
+    print("DEBUG:")
+    print(data.to_string())
     if data.isna().any():
-        raise Exception("Requested data contains nans, {data}")
-    quarter_ends = pd.date_range(start=start_date, end=data.index[-1], freq='QE')
+        print("DEBUG:")
+        print(data.to_string())
+        raise Exception("Requested data contains nans")
+    quarter_ends = pd.date_range(start=start_date, end=data.index[-1], freq='QE').date
     missing_quarter_ends = [date for date in quarter_ends if date not in data.index]
     if len(missing_quarter_ends) > 0:
-        raise Exception("Requested data does not contain these monthend values: {missing_quarter_ends}, {data}")
+        print("DEBUG:")
+        print(data.to_string())
+        raise Exception(f"Requested data does not contain these monthend values: {missing_quarter_ends}")
 
 @st.cache_data
 def get_ticker_data(ticker, start_date):
@@ -233,7 +239,7 @@ def get_graph3(*_, finnhub_reported_data, start_date, **rest):
         fill_zeros=True,
         adjust=AdjustReported.ANNUALSYTD
     )
-    verify_quarterly_data_irregularities(eps_diluted, start_date.replace(year = start_date.year - 1)
+    verify_quarterly_data_irregularities(eps_diluted, start_date.replace(year = start_date.year - 1))
     graph3 = eps_diluted.rolling(4).sum().to_frame()
 
     return graph3
@@ -279,7 +285,7 @@ def get_graph5(*_, quarterly_series, mcap, **rest):
 # ebit issue is issue with IBM
 @st.cache_data
 def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, num_shares, **rest):
-    verify_quarterly_data_irregularities(quarterly_series, start_date)
+    verify_quarterly_data_irregularities(quarterly_series["ebitPerShare"], start_date)
     ebit = piecewise_op_search(
             quarterly_series["ebitPerShare"][::-1],
         num_shares,
