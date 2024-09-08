@@ -10,10 +10,10 @@ import finnhub
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import streamlit as st
 import yfinance as yf
+from plotly.subplots import make_subplots
 
 from apikeys import ConfigKey, get_secret
 
@@ -26,6 +26,11 @@ def get_quarter_end_date(year, quarter):
     date_index = datetime.date(year, month, 28) + datetime.timedelta(days=4)
     return date_index - datetime.timedelta(days=date_index.day)
 
+def get_quarter_end_by_date(date):
+    quarter = ((date.month + 10) // 3) % 4 + 1
+    ret = get_quarter_end_date(date.year, quarter)
+    return ret
+    
 
 def flatten_report(report):
     date_index = get_quarter_end_date(report["year"], report["quarter"])
@@ -45,8 +50,6 @@ SP500DATA = yf.Ticker("^GSPC")
 
 def verify_quarterly_data_irregularities(data, start_date):
     data = data[data.index >= start_date]
-    print("DEBUG:")
-    print(data.to_string())
     if data.isna().any():
         print("DEBUG:")
         print(data.to_string())
@@ -93,15 +96,14 @@ def get_ticker_data(ticker, start_date):
         for i in v:
             mapping[i["period"]][k] = i["v"]
 
-    quarterly_series = pd.DataFrame(mapping).transpose()
-    quarterly_series.index = pd.to_datetime(quarterly_series.index).date
+    quarterly_series = pd.DataFrame(mapping).transpose()[::-1]
+    quarterly_series.index = np.vectorize(get_quarter_end_by_date)(pd.to_datetime(quarterly_series.index).date)
 
     price_to_book = quarterly_series["pb"]
     book_value = quarterly_series["bookValue"]
 
-    q_mcap = (book_value.mul(price_to_book, fill_value=np.NaN) * (10**6))[::-1]
+    q_mcap = (book_value.mul(price_to_book, fill_value=np.NaN) * (10**6))
     q_mcap.index = pd.to_datetime(q_mcap.index).date
-    q_mcap = q_mcap
 
     # so this may look stupid, multiply and divide by the same column, but this essentially is first dividing by
     # the values on the exact dates to 'normalize' the value, and then interpolate with the remaining prices as indexes.
@@ -131,7 +133,7 @@ def get_ticker_data(ticker, start_date):
     )
 
     q_ev = quarterly_series["ev"]
-    q_ev = q_ev[q_ev.index >= start_date][::-1] * 1000000
+    q_ev = q_ev[q_ev.index >= start_date] * 1000000
 
     ev = piecewise_op_search(q_ev, mcap, operator.sub)
     ev = piecewise_op_search(mcap, ev, operator.add)
@@ -204,12 +206,12 @@ def nan_default_chain(data, key_list, fill_zeros=False, adjust=AdjustReported.NO
 def get_graph1(*_, start_date, hprice, ticker_name, SP500_hprice, **rest):
     price_return = (
         ((hprice / hprice[hprice.index.searchsorted(start_date)]) - 1)
-    ).rename(ticker_name)
+    )
     SP500_return = (
         ((SP500_hprice / SP500_hprice[SP500_hprice.index.searchsorted(start_date)]) - 1)
-    ).rename("SP 500")
+    )
 
-    graph1 = pd.concat([SP500_return, price_return], axis=1)
+    graph1 = pd.concat([SP500_return, price_return], keys=["SP 500", ticker_name], axis=1)
     graph1.index = pd.to_datetime(graph1.index, utc=True).date
 
     return graph1
@@ -240,7 +242,7 @@ def get_graph3(*_, finnhub_reported_data, start_date, **rest):
         adjust=AdjustReported.ANNUALSYTD
     )
     verify_quarterly_data_irregularities(eps_diluted, start_date.replace(year = start_date.year - 1))
-    graph3 = eps_diluted.rolling(4).sum().to_frame()
+    graph3 = eps_diluted.rolling(4).sum().rename("EPS Diluted (TTM)").to_frame()
 
     return graph3
 
@@ -262,17 +264,17 @@ def get_graph4(*_, finnhub_reported_data, num_shares, dividend_amount, quarterly
 # graph5
 # good
 @st.cache_data
-def get_graph5(*_, quarterly_series, mcap, **rest):
+def get_graph5(*_, quarterly_series, mcap, start_date, **rest):
     price_to_book = quarterly_series["pb"]
     price_to_cashflow = quarterly_series["pfcfTTM"]
     price_to_sales = quarterly_series["psTTM"]
 
-    graph5 = pd.concat([price_to_book, price_to_cashflow, price_to_sales], axis=1)[::-1]
-    graph5.index = pd.to_datetime(graph5.index, utc=True).date
-
     verify_quarterly_data_irregularities(price_to_book, start_date)
     verify_quarterly_data_irregularities(price_to_cashflow, start_date)
     verify_quarterly_data_irregularities(price_to_sales, start_date)
+
+    graph5 = pd.concat([price_to_book, price_to_cashflow, price_to_sales], keys=["Price to Book", "Price to Cashflow (TTM)", "Price to Sales (TTM)"], axis=1)
+    graph5.index = pd.to_datetime(graph5.index, utc=True).date
 
     # see above
     graph5 = piecewise_op_search(graph5, mcap, lambda df1, df2: df1.div(df2, axis=0))
@@ -284,10 +286,10 @@ def get_graph5(*_, quarterly_series, mcap, **rest):
 # graph6
 # ebit issue is issue with IBM
 @st.cache_data
-def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, num_shares, **rest):
+def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, start_date, num_shares, **rest):
     verify_quarterly_data_irregularities(quarterly_series["ebitPerShare"], start_date)
     ebit = piecewise_op_search(
-            quarterly_series["ebitPerShare"][::-1],
+            quarterly_series["ebitPerShare"],
         num_shares,
         operator.mul,
         )
@@ -295,7 +297,7 @@ def get_graph6(*_, finnhub_reported_data, quarterly_series, ev, num_shares, **re
     ebit = ebit.rolling(4).sum()
 
     ev_ebit = piecewise_op_search(ev, ebit, operator.truediv)
-    graph6 = ev_ebit.to_frame()
+    graph6 = ev_ebit.rename("EV / EBIT (TTM)").to_frame()
 
     return graph6
 
@@ -314,7 +316,7 @@ def get_graph7(*_, finnhub_reported_data, hprice, ticker_name, dividend_amount, 
     total_return = (total_return / total_return.iloc[0]) - 1
 
     graph7 = pd.concat(
-        [price_return, total_return], keys=["Price Return", "Total"], axis=1
+        [price_return, total_return], keys=["Price Return", "Total Return"], axis=1
     )
 
     return graph7
@@ -327,7 +329,7 @@ def get_graph8(*_, finnhub_reported_data, quarterly_series, revenue, start_date,
     revenue_growth = revenue_ttm.rolling(5).apply(lambda a: a[4] - a[0])
     revenue_growth = (revenue_growth / revenue_growth[revenue_growth.index.searchsorted(start_date)]) - 1
 
-    graph8 = revenue_growth.to_frame()
+    graph8 = revenue_growth.rename("Revenue Growth (YoY)").to_frame()
     return graph8
 
 
@@ -341,8 +343,13 @@ def get_graph9(*_, quarterly_series, **rest):
             quarterly_series["rotcTTM"],
             quarterly_series["roaTTM"],
         ],
+        keys=[
+            "Return on Equity (TTM)",
+            "Return on Total Capital (TTM)",
+            "Return on Assets (TTM)",
+        ],
         axis=1,
-    )[::-1]
+    )
 
     return graph9
 
@@ -352,7 +359,7 @@ def get_graph9(*_, quarterly_series, **rest):
 def get_graph10(*_, finnhub_reported_data, revenue, quarterly_series, **rest):
     revenue_ttm = revenue.rolling(4).sum()
 
-    graph10 = pd.concat([revenue, revenue_ttm], keys=['revenue', 'revenue_ttm'], axis=1)
+    graph10 = pd.concat([revenue_ttm], keys=['Revenue (TTM)'], axis=1)
     return graph10
 
 
@@ -367,7 +374,7 @@ def get_graph11(*_, finnhub_reported_data, **rest):
         ],
     )
 
-    graph11 = shares_outstanding_diluted.rolling(4).mean().to_frame()
+    graph11 = shares_outstanding_diluted.rolling(4).mean().rename("Weighted Average Diluted Shares Outstanding (TTM)").to_frame()
 
     return graph11
 
@@ -375,19 +382,12 @@ def get_graph11(*_, finnhub_reported_data, **rest):
 # graph12
 # sac tangible, book value and book value per share
 @st.cache_data
-def get_graph12(*_, finnhub_reported_data, quarterly_series, **rest):
+def get_graph12(*_, finnhub_reported_data, quarterly_series, num_shares, **rest):
     book_value = quarterly_series["bookValue"] * 1000000
 
-    num_shares = nan_default_chain(
-        finnhub_reported_data,
-        [
-            "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic",
-            "us-gaap_WeightedAverageNumberOfSharesOutstandingBasic",
-        ],
-    )
     book_share = piecewise_op_search(book_value, num_shares, operator.truediv)
 
-    graph12 = pd.concat([book_share, book_value], axis=1)[::-1]
+    graph12 = pd.concat([book_share, book_value], keys=["BV per share", "Book Value"], axis=1)
 
     return graph12
 
