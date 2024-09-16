@@ -1,4 +1,3 @@
-import dotenv
 from enum import Enum
 import streamlit
 

@@ -30,6 +30,23 @@ def get_quarter_end_by_date(date):
     quarter = ((date.month + 10) // 3) % 4 + 1
     ret = get_quarter_end_date(date.year, quarter)
     return ret
+
+def similar_range_to(df, min1, max1):
+    min2, max2 = df.min(), df.max()
+
+    # ranges must be within 2x.
+    if max2 - min2 != 0:
+        ratio = abs((max1 - min1) / (max2 - min2))
+
+        if ratio > 2 or ratio < 0.5:
+            return False
+
+    # require some intersection
+    if min2 > max1 or min1 > max2:
+        return False
+
+    # perhaps add more conditions
+    return True
     
 
 def flatten_report(report):
@@ -239,8 +256,9 @@ def get_graph3(*_, finnhub_reported_data, start_date, **rest):
             "EarningsPerShareBasic",
         ],
         fill_zeros=True,
-        adjust=AdjustReported.ANNUALSYTD
+        adjust=AdjustReported.ALLYTD
     )
+    print(eps_diluted)
     verify_quarterly_data_irregularities(eps_diluted, start_date.replace(year = start_date.year - 1))
     graph3 = eps_diluted.rolling(4).sum().rename("EPS Diluted (TTM)").to_frame()
 
@@ -479,17 +497,27 @@ for ticker, tab in zip(ticker_vals, tabs):
             
             fig = go.Figure()
             layoutupdate = {}
-            for i, col in enumerate(graph):
+            axes = []
+            for col in graph:
+                for i, axis in enumerate(axes):
+                    if similar_range_to(graph[col], axis[1], axis[2]):
+                        axes[i] = ([*axes[i][0], col], min(axis[1], graph[col].min()), max(axis[2], graph[col].max()))
+                        break
+                else:
+                    axes.append(([col], graph[col].min(), graph[col].max()))
+
+            for i, axis in enumerate(axes):
                 label = str(i + 1) if i != 0 else ""
-                fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=col,yaxis=f"y{label}"))
-                layoutupdate[f"yaxis{label}"] = dict(title=col, autoshift=True, title_standoff=5, shift=-10, anchor="free", overlaying="y")
+                for col in axis[0]:
+                    fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=col,yaxis=f"y{label}"))
+                layoutupdate[f"yaxis{label}"] = dict(title=', '.join(axis[0]), autoshift=True, title_standoff=5, shift=-10, anchor="free", overlaying="y")
                 if "ypercent" in data:
                     layoutupdate[f"yaxis{label}"]["tickformat"] =".2%"
 
             del layoutupdate['yaxis']['overlaying']
             del layoutupdate['yaxis']['anchor']
 
-            fig.update_layout(**layoutupdate, title=f"{ticker}: {data['title']}", xaxis_title="Date", margin_l = 80 + 20*i)
+            fig.update_layout(**layoutupdate, title=f"{ticker}: {data['title']}", xaxis_title="Date", margin_l = 80 + 20 * len(axes))
 
             if "show_legend" in data:
                 fig.update_layout(showlegend=data["show_legend"])
