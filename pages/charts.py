@@ -90,13 +90,13 @@ def render_main():
         if data.isna().any():
             print("DEBUG:")
             print(data.to_string())
-            raise Exception("Requested data contains nans")
+            st.warning("Requested data contains nans")
         quarter_ends = pd.date_range(start=start_date, end=data.index[-1], freq='QE').date
         missing_quarter_ends = [date for date in quarter_ends if date not in data.index]
         if len(missing_quarter_ends) > 0:
             print("DEBUG:")
             print(data.to_string())
-            raise Exception(f"Requested data does not contain these monthend values: {missing_quarter_ends}")
+            st.warning(f"Requested data does not contain these monthend values: {missing_quarter_ends}")
     
     @st.cache_data
     def get_ticker_data(ticker, start_date):
@@ -506,6 +506,13 @@ def render_main():
     ]
     
     ticker_vals = [val.strip().upper() for val in ticker_input.split(",") if val.strip() != ""]
+    period = st.selectbox("Select time period", options=["1Y", "3Y", "5Y", "10Y", "Custom"], index = 1)
+
+    start_date = datetime.date.today()
+    if period == "Custom":
+        start_date = st.date_input("Select start date", value = start_date.replace(year = start_date.year - 3))
+    else:
+        start_date = start_date.replace(year = start_date.year - int(period[:-1]))
     
     if len(ticker_vals) == 0:
         tabs = []
@@ -528,13 +535,13 @@ def render_main():
         cols[ind].button(ticker_name, type="primary", on_click=set_tab, disabled=ind == tab)
 
     try:
-       start_date = datetime.date(2021, 8, 22)
        ticker_data = get_ticker_data(ticker, start_date)
     except Exception as e:
        st.error(
            f"Data could not be fetched. Double check the ticker {ticker} is correct."
        )
        st.exception(e)
+       return
     
     for func, data in zip(graph_funcs, meta_info):
        try:
@@ -589,6 +596,10 @@ def render_main():
     def next_tab():
         st.session_state["tab"] = (tab + 1) % len(ticker_vals)
 
+    def prev_tab():
+        st.session_state["tab"] = (tab + len(ticker_vals) - 1) % len(ticker_vals)
+
+    st.button("Previous Tab", type="primary", on_click=next_tab)
     st.button("Next Tab", type="primary", on_click=next_tab)
 
 
