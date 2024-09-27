@@ -4,6 +4,7 @@ let
     self = python;
     packageOverrides = pyfinal: pyprev: {
      finnhub-python = pyfinal.callPackage ./finnhub-python.nix { };
+     fmpsdk = pyfinal.callPackage ./fmpsdk.nix { };
     };
   };
 in pkgs.mkShell {
@@ -16,6 +17,7 @@ in pkgs.mkShell {
       python-pkgs.yfinance
       python-pkgs.numpy
       python-pkgs.finnhub-python
+      python-pkgs.fmpsdk
       python-pkgs.unidecode
     ]))
   ];

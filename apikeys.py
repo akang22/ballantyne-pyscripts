@@ -5,6 +5,7 @@ import streamlit
 class ConfigKey(Enum):
     ALPHA_VANTAGE = "ALPHA_VANTAGE"
     FINNHUB = "FINNHUB"
+    FMP = "FMP"
 
 
 def get_secret(key: ConfigKey):
