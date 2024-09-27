@@ -52,11 +52,11 @@ def render_main():
     def similar_range_to(df, min1, max1):
         min2, max2 = df.min(), df.max()
     
-        # ranges must be within 2x.
+        # ranges must be within 3x.
         if max2 - min2 != 0:
             ratio = abs((max1 - min1) / (max2 - min2))
     
-            if ratio > 2 or ratio < 0.5:
+            if ratio > 3 or ratio * 3 < 1:
                 return False
     
         # require some intersection
@@ -74,7 +74,10 @@ def render_main():
         # todo: sort dividends by quarter?
         dividend_amount = finapi.dividends(ticker)
         revenue = finapi.revenue(ticker)
-        ev = finapi.enterprise_value(ticker)
+        q_ev = finapi.enterprise_value(ticker)
+
+        ev = piecewise_op_search(q_ev, mcap, operator.sub)
+        ev = piecewise_op_search(mcap, ev, operator.add)
     
         return {
             "hprice": hprice,
@@ -182,7 +185,7 @@ def render_main():
         ebit = piecewise_op_search(ebit_revenue, revenue, lambda df1, df2: df1.mul(df2, axis=0))
 
         ev_ebit = piecewise_op_search(ev, ebit, lambda df1, df2: df1.div(df2, axis=0)).rolling(4).mean() / 4
-        graph6 = pd.concat([ev_ebit, ev_ebitda], keys=["EV / EBIT (TTM)", "EV / EBITDA (TTM)"]).to_frame()
+        graph6 = pd.concat([ev_ebit, ev_ebitda], keys=["EV / EBIT (TTM)", "EV / EBITDA (TTM)"], axis=1)
     
         return graph6
     
@@ -265,7 +268,7 @@ def render_main():
     # graph12
     # sac tangible, book value and book value per share
     @st.cache_data
-    def get_graph12(*_, num_shares, **rest):
+    def get_graph12(*_, **rest):
         book_share = finapi.book_value_share(ticker)
         tangible_bv = finapi.tangible_book_value(ticker)
         total_debt = finapi.total_debt(ticker)

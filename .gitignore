@@ -11,3 +11,4 @@ xirr/data
 log.txt
 build/
 *.DS_Store
+*.sqlite

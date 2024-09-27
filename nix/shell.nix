@@ -17,8 +17,8 @@ in pkgs.mkShell {
       python-pkgs.yfinance
       python-pkgs.numpy
       python-pkgs.finnhub-python
-      python-pkgs.fmpsdk
       python-pkgs.unidecode
+      python-pkgs.requests-cache
     ]))
   ];
 }

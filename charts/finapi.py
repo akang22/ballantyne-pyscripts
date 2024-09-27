@@ -1,11 +1,13 @@
 import requests
+from requests_cache import CachedSession
 
-# initialize perhaps with other things like useragent, retry, caching
-r = requests
 from apikeys import ConfigKey, get_secret
 import pandas as pd
 import datetime
 import yfinance
+
+# initialize perhaps with other things like useragent, retry, caching
+r = CachedSession('finapi', expire_after=datetime.timedelta(hours=1))
 
 FMP_DATE_FORMAT = "%Y-%m-%d"
 
@@ -16,12 +18,12 @@ def add_date_index(func):
     def new(*args, **kwargs):
         v = func(*args, **kwargs)
         v.index = pd.to_datetime(v.index).date
-        return v
+        return v.iloc[::-1]
     return new
 
 @add_date_index
 def price(ticker: str):
-    return yfinance.Ticker(ticker).history(period="max", auto_adjust=False)["Open"]
+    return yfinance.Ticker(ticker).history(period="max", auto_adjust=False)["Open"].iloc[::-1]
 
 
 @add_date_index
