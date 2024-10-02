@@ -71,7 +71,6 @@ def render_main():
         hprice = finapi.price(ticker)
         SP500_hprice = finapi.price("^GSPC")
         mcap = finapi.mcap(ticker)
-        # todo: sort dividends by quarter?
         dividend_amount = finapi.dividends(ticker)
         revenue = finapi.revenue(ticker)
         q_ev = finapi.enterprise_value(ticker)
@@ -146,6 +145,9 @@ def render_main():
     # graph4
     @st.cache_data
     def get_graph4(*_, dividend_amount, start_date, **rest):
+        if dividend_amount is None:
+            raise Exception("No dividends found")
+
         dividend_ratios = dividend_amount.rolling(4).sum().rolling(5).apply(lambda a: (a[4] - a[0]) / a[0] * 100)
     
         graph4 = pd.concat(
@@ -177,14 +179,15 @@ def render_main():
     # graph6
     # ebit issue is issue with IBM
     @st.cache_data
-    def get_graph6(*_, ticker, ev, start_date, **rest):
-        ev_ebitda = finapi.ev_ebitda(ticker).rolling(4).mean() / 4
+    def get_graph6(*_, ticker, ev, **rest):
+        ebitda = finapi.ebitda(ticker).rolling(4).sum()
+        ev_ebitda = piecewise_op_search(ev, ebitda, lambda df1, df2: df1.div(df2, axis=0))
 
         ebit_revenue = finapi.ebit_revenue(ticker)
         revenue = finapi.revenue(ticker)
-        ebit = piecewise_op_search(ebit_revenue, revenue, lambda df1, df2: df1.mul(df2, axis=0))
+        ebit = piecewise_op_search(ebit_revenue, revenue, lambda df1, df2: df1.mul(df2, axis=0)).rolling(4).sum()
 
-        ev_ebit = piecewise_op_search(ev, ebit, lambda df1, df2: df1.div(df2, axis=0)).rolling(4).mean() / 4
+        ev_ebit = piecewise_op_search(ev, ebit, lambda df1, df2: df1.div(df2, axis=0))
         graph6 = pd.concat([ev_ebit, ev_ebitda], keys=["EV / EBIT (TTM)", "EV / EBITDA (TTM)"], axis=1)
     
         return graph6
@@ -193,6 +196,9 @@ def render_main():
     # graph7
     @st.cache_data
     def get_graph7(*_, hprice, ticker, dividend_amount, start_date, **rest):
+        if dividend_amount is None:
+            raise Exception("No dividends found")
+
         # todo: move into display logic?
         price_return = hprice.rename(ticker)[hprice.index >= start_date]
     
@@ -219,7 +225,7 @@ def render_main():
         
         ebitda_ttm = finapi.ebitda(ticker).rolling(4).sum()
     
-        graph8 = revenue_growth.rename("Revenue Growth (YoY)").to_frame()
+        graph8 = pd.concat([revenue_growth, ebitda_ttm], keys=["Revenue Growth (YoY)", "EBIDTA (TTM)"], axis=1)
         return graph8
     
     
@@ -324,11 +330,12 @@ def render_main():
         },
         {
             "title": "Revenue Growth (YoY), EBITDA (TTM)",
-            "ypercent": True,
+            "ypercent": [True, False],
+            "singleaxis": False,
         },
         {
             "title": "Return on Equity (TTM), Return on Total Capital (TTM), Return on Assets (TTM)",
-            "ypercent": True,
+            "ypercent": True
         },
         {
             "title": "Total Revenue (TTM), Net Income (TTM)",
@@ -399,6 +406,8 @@ def render_main():
            axes = []
            for col in graph:
                for i, axis in enumerate(axes):
+                   if ("singleaxis" in data and not data["singleaxis"]):
+                       continue
                    if ("singleaxis" in data and data["singleaxis"]) or similar_range_to(graph[col], axis[1], axis[2]):
                        axes[i] = ([*axes[i][0], col], min(axis[1], graph[col].min()), max(axis[2], graph[col].max()))
                        break
@@ -415,7 +424,7 @@ def render_main():
                    layoutupdate[f"yaxis{label}"]["overlaying"] = "y"
                    layoutupdate[f"yaxis{label}"]["anchor"] = "free"
     
-               if "ypercent" in data:
+               if "ypercent" in data and (data["ypercent"] is True or data["ypercent"][i] is True):
                    layoutupdate[f"yaxis{label}"]["tickformat"] =".2%"
     
            fig.update_layout(**layoutupdate, title=f"{ticker}: {data['title']}", hovermode="x", xaxis_title="Date", margin_l = 80 + 20 * len(axes))

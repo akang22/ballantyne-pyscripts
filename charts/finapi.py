@@ -17,6 +17,8 @@ FMP_DATE_FORMAT = "%Y-%m-%d"
 def add_date_index(func):
     def new(*args, **kwargs):
         v = func(*args, **kwargs)
+        if v is None:
+            return v
         v.index = pd.to_datetime(v.index).date
         return v.iloc[::-1]
     return new
@@ -86,6 +88,8 @@ def net_income(ticker: str):
 def dividends(ticker: str):
     apikey = get_secret(ConfigKey.FMP)
     val = r.get(f"https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/{ticker}?apikey={apikey}").json()['historical']
+    if len(val) == 0:
+        return None 
 
     # todo: think if should use adj or not
     return pd.DataFrame(val).set_index('date')['adjDividend']
