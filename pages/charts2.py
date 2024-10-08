@@ -440,7 +440,8 @@ def render_main():
                for col in axis[0]:
                    print((col if not ('shortform' in data and col in data['shortform']) else data['shortform'][col]))
                    fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=(col if not ('shortform' in data and col in data['shortform']) else data['shortform'][col]),yaxis=f"y{label}"))
-               layoutupdate[f"yaxis{label}"] = dict(title=', '.join(axis[0]), autoshift=True, title_standoff=10, shift=-30)
+               axis_title = ", ".join([data['shortform'][col] if ('shortform' in data and col in data['shortform']) else col for col in axis[0]])
+               layoutupdate[f"yaxis{label}"] = dict(title=(', '.join(axis[0]) if len(axis[0]) == 1 else axis_title), autoshift=True, title_standoff=10, shift=-30)
                if i != 0:
                    layoutupdate[f"yaxis{label}"]["tickmode"] = "sync"
                    layoutupdate[f"yaxis{label}"]["overlaying"] = "y"
