@@ -46,11 +46,7 @@ def render_main():
                     div[data-testid="stSlider"] {
                         display: none;
                     }
-                </style>
-                <button onclick="window.print()">
-                Click me
-                </button>
-                """, unsafe_allow_html=True)
+                </style>""", unsafe_allow_html=True)
     st.title("StockCharts")
     
     ticker_input = st.text_input("Ticker Value")
