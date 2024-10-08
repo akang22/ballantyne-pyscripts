@@ -25,7 +25,9 @@ def add_date_index(func):
 
 @add_date_index
 def price(ticker: str):
-    return yfinance.Ticker(ticker).history(period="max", auto_adjust=False)["Open"].iloc[::-1]
+    apikey = get_secret(ConfigKey.FMP)
+    val = r.get(f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?apikey={apikey}").json()
+    return pd.DataFrame(val['historical']).set_index('date')['close']
 
 
 @add_date_index
@@ -88,11 +90,12 @@ def net_income(ticker: str):
 def dividends(ticker: str):
     apikey = get_secret(ConfigKey.FMP)
     val = r.get(f"https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/{ticker}?apikey={apikey}").json()['historical']
+    # todo: make exception?
     if len(val) == 0:
         return None 
 
     # todo: think if should use adj or not
-    return pd.DataFrame(val).set_index('date')['adjDividend']
+    return pd.DataFrame(val).set_index('date')['dividend']
 
 @add_date_index
 def _key_metrics(ticker: str):

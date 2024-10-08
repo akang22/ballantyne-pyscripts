@@ -12,6 +12,22 @@ import plotly.graph_objects as go
 import streamlit as st
 from charts import finapi
 
+class NoDividendsException(Exception):
+    pass
+
+eng_fmt = pd.io.formats.format.EngFormatter(accuracy=2, use_eng_prefix=True)
+eng_fmt.ENG_PREFIXES = {
+        0: "",
+        3: "k",
+        6: "M",
+        9: "G",
+        12: "T",
+        15: "P",
+        18: "E",
+        21: "Z",
+        24: "Y",
+    }
+
 def render_main():
     st.set_page_config(layout = "wide")
     st.markdown("""
@@ -75,6 +91,7 @@ def render_main():
         revenue = finapi.revenue(ticker)
         q_ev = finapi.enterprise_value(ticker)
 
+        # TODO: we should adjust to start of quarter
         ev = piecewise_op_search(q_ev, mcap, operator.sub)
         ev = piecewise_op_search(mcap, ev, operator.add)
     
@@ -110,6 +127,7 @@ def render_main():
     # graph1
     @st.cache_data
     def get_graph1(*_, start_date, hprice, ticker, SP500_hprice, **rest):
+        print(hprice.index.searchsorted(start_date))
         price_return = (
             ((hprice / hprice[hprice.index.searchsorted(start_date)]) - 1)
         )
@@ -137,7 +155,8 @@ def render_main():
     @st.cache_data
     def get_graph3(*_, ticker, start_date, **rest):
         eps_diluted = finapi.eps_diluted(ticker)
-        graph3 = eps_diluted.rolling(4).sum().rename("EPS Diluted (TTM)").to_frame()
+        # TODO: make sure rollings are expected direction
+        graph3 = eps_diluted.rolling(4).sum().rename("EPS Diluted Before Extra (TTM)").to_frame()
     
         return graph3
     
@@ -146,7 +165,7 @@ def render_main():
     @st.cache_data
     def get_graph4(*_, dividend_amount, start_date, **rest):
         if dividend_amount is None:
-            raise Exception("No dividends found")
+            raise NoDividendsException("No dividends found")
 
         dividend_ratios = dividend_amount.rolling(4).sum().rolling(5).apply(lambda a: (a[4] - a[0]) / a[0] * 100)
     
@@ -197,7 +216,7 @@ def render_main():
     @st.cache_data
     def get_graph7(*_, hprice, ticker, dividend_amount, start_date, **rest):
         if dividend_amount is None:
-            raise Exception("No dividends found")
+            raise NoDividendsException("No dividends found")
 
         # todo: move into display logic?
         price_return = hprice.rename(ticker)[hprice.index >= start_date]
@@ -220,12 +239,11 @@ def render_main():
     @st.cache_data
     def get_graph8(*_, ticker, revenue, start_date, **rest):
         revenue_ttm = revenue.rolling(4).sum()
-        revenue_growth = revenue_ttm.rolling(5).apply(lambda a: a[4] - a[0])
-        revenue_growth = (revenue_growth / revenue_growth[revenue_growth.index.searchsorted(start_date)]) - 1
+        revenue_growth = revenue_ttm.rolling(5).apply(lambda a: (a[4] / a[0]) - 1)
         
         ebitda_ttm = finapi.ebitda(ticker).rolling(4).sum()
     
-        graph8 = pd.concat([revenue_growth, ebitda_ttm], keys=["Revenue Growth (YoY)", "EBIDTA (TTM)"], axis=1)
+        graph8 = pd.concat([revenue_growth, ebitda_ttm], keys=["Revenue Growth (YoY)", "EBITDA (TTM)"], axis=1)
         return graph8
     
     
@@ -243,9 +261,9 @@ def render_main():
                 roa
             ],
             keys=[
-                "RO Equity",
-                "RO Total Capital",
-                "RO Assets",
+                "Return on Equity (TTM)",
+                "Return on Total Capital (TTM)",
+                "Return on Assets (TTM)",
             ],
             axis=1,
         )
@@ -259,7 +277,7 @@ def render_main():
         revenue_ttm = revenue.rolling(4).sum()
         net_income = finapi.net_income(ticker).rolling(4).sum()
     
-        graph10 = pd.concat([revenue_ttm, net_income], keys=['Revenue (TTM)', 'Net Income (TTM)'], axis=1)
+        graph10 = pd.concat([revenue_ttm, net_income], keys=['Total Revenue (TTM)', 'Net Income (TTM)'], axis=1)
         return graph10
     
     
@@ -308,44 +326,44 @@ def render_main():
             "singleaxis": True,
         },
         {
-            "title": "Market Cap, Enterprise Value",
+            "shortform": { "Enterprise Value": "EV"}
         },
         {
-            "title": "EPS: Diluted Before Extra (TTM)",
+            "shortform": { "EPS Diluted Before Extra (TTM)": "Diluted EPS" },
             "show_legend": False,
         },
         {
-            "title": "1 Year Dividend Growth Rate, Dividend Amount",
+            "shortform": { "1 Year Dividend Growth Rate": "Div Growth", "Dividend Amount": "Div Amount"},
         },
         {
-            "title": "Price / Book, Price / Cash Flow (TTM), Price / Sales (TTM)",
+            "shortform": { "Price to Book": "P/Book", "Price to Cashflow (TTM)": "P/Cashflow", "Price to Sales (TTM)": "P/Sales" },
         },
         {
-            "title": "EV / EBIT (TTM), EV / EBITDA (TTM)",
+            "shortform": { "EV / EBIT (TTM)": "EV/EBIT", "EV / EBITDA (TTM)": "EV/EBITDA" }
         },
         {
-            "title": "Price Return, Total Return",
             "ypercent": True,
             "singleaxis": True,
         },
         {
-            "title": "Revenue Growth (YoY), EBITDA (TTM)",
+            "shortform": { "Revenue Growth (YoY)": "Revenue Growth", "EBITDA (TTM)": "EBITDA" },
             "ypercent": [True, False],
             "singleaxis": False,
         },
         {
-            "title": "Return on Equity (TTM), Return on Total Capital (TTM), Return on Assets (TTM)",
+            "shortform": { "Return on Equity (TTM)": "RoE", "Return on Total Capital (TTM)": "RoTC", "Return on Assets (TTM)": "RoA" },
             "ypercent": True
         },
         {
-            "title": "Total Revenue (TTM), Net Income (TTM)",
+            "shortform": { "Total Revenue (TTM)": "Revenue", "Net Income (TTM)": "Income" }
         },
         {
-            "title": "Diluted Weighted Average Shares Outstanding (TTM)",
+            "shortform": { "Diluted Weighted Average Shares Outstanding (TTM)": "DWAS Outstanding" },
             "show_legend": False,
         },
         {
             "title": "Book Value / Share, Tangible Book Value, Total Debt",
+            "shortform": { "Book Value / Share": "BV/Share", "Tangible Book Value": "Tang BV", "Total Debt": "Debt"}
         },
     ]
     
@@ -399,7 +417,10 @@ def render_main():
            col2.text("\n")
            col2.text("\n")
            col2.text("\n")
-           col2.dataframe(graph.iloc[-1])
+           col2.dataframe(graph.iloc[[0, -1]].style.format({
+               col: '{:,.2}%'.format if "ypercent" in data and (data["ypercent"] is True or data["ypercent"][i] is True) else eng_fmt
+               for i, col in enumerate(graph)
+               }))
            
            fig = go.Figure()
            layoutupdate = {}
@@ -417,7 +438,8 @@ def render_main():
            for i, axis in enumerate(axes):
                label = str(i + 1) if i != 0 else ""
                for col in axis[0]:
-                   fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=col,yaxis=f"y{label}"))
+                   print((col if not ('shortform' in data and col in data['shortform']) else data['shortform'][col]))
+                   fig.add_trace(go.Scatter(x=graph.index, y=graph[col], name=(col if not ('shortform' in data and col in data['shortform']) else data['shortform'][col]),yaxis=f"y{label}"))
                layoutupdate[f"yaxis{label}"] = dict(title=', '.join(axis[0]), autoshift=True, title_standoff=10, shift=-30)
                if i != 0:
                    layoutupdate[f"yaxis{label}"]["tickmode"] = "sync"
@@ -427,13 +449,15 @@ def render_main():
                if "ypercent" in data and (data["ypercent"] is True or data["ypercent"][i] is True):
                    layoutupdate[f"yaxis{label}"]["tickformat"] =".2%"
     
-           fig.update_layout(**layoutupdate, title=f"{ticker}: {data['title']}", hovermode="x", xaxis_title="Date", margin_l = 80 + 20 * len(axes))
+           fig.update_layout(**layoutupdate, title=f"{ticker}: {', '.join(graph.columns) if not ('title' in data) else data['title']}", hovermode="x unified", xaxis_title="Date", margin_l = 80 + 20 * len(axes))
     
            if "show_legend" in data:
                fig.update_layout(showlegend=data["show_legend"])
                fig.update_layout({"legend_title_text": "Legend"})
            col1.plotly_chart(fig, use_container_width=True)
-    
+       except NoDividendsException as nde:
+           st.warning(f"Graph could not be shown as no dividends were found for ticker {ticker}")
+
        except Exception as e:
            st.text(f"Graph {data['title']} could not be shown due to the following error:")
            st.exception(e)
