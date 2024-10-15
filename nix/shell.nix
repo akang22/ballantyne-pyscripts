@@ -10,6 +10,7 @@ let
 in pkgs.mkShell {
   packages = [
     (python.withPackages (python-pkgs: [
+      python-pkgs.black
       python-pkgs.pandas
       python-pkgs.plotly
       python-pkgs.requests

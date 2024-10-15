@@ -74,6 +74,9 @@ def _income_statement(ticker: str):
 def revenue(ticker: str):
     return _income_statement(ticker)['revenue']
 
+def eps(ticker: str):
+    return _income_statement(ticker)['eps']
+
 def eps_diluted(ticker: str):
     return _income_statement(ticker)['epsdiluted']
 
@@ -104,6 +107,10 @@ def _key_metrics(ticker: str):
 
     # todo: think if should use adj or not
     return pd.DataFrame(val).set_index('date')
+
+def price_earnings(ticker:str):
+    return _ratios(ticker)['priceEarningsRatio']
+    # return _key_metrics(ticker)['peRatio']
 
 def ev_ebitda(ticker: str):
     return _key_metrics(ticker)['enterpriseValueOverEBITDA']
