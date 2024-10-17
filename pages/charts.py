@@ -1,6 +1,6 @@
-import collections
+import json
+import copy
 import datetime
-import enum
 import warnings
 import math
 
@@ -61,7 +61,7 @@ def render_main():
         unsafe_allow_html=True,
     )
     st.title("Company Metrics")
-    st.image(str(pathlib.Path().resolve() / "assets" / "logo.jpg"))
+    # st.image(str(pathlib.Path().resolve() / "assets" / "logo.jpg"))
 
     ticker_input = st.text_input("Ticker Value")
 
@@ -219,6 +219,7 @@ def render_main():
 
         ev_ebit = piecewise_op_search(ev, ebit, lambda df1, df2: df1.div(df2, axis=0))
 
+        """
         pe_ttm = finapi.price_earnings(ticker).rolling(4).mean()
 
         pe_ttm = piecewise_op_search(
@@ -227,12 +228,21 @@ def render_main():
         pe_ttm = piecewise_op_search(
             mcap, pe_ttm, lambda df1, df2: df2.mul(df1, axis=0)
         )
+        """
 
-        pe_ttm2 = piecewise_op_search(hprice, finapi.eps(ticker).rolling(4).sum(), lambda df1, df2: df1.div(df2, axis=0))
+        pe_ttm2 = piecewise_op_search(
+            hprice,
+            finapi.eps(ticker).rolling(4).sum(),
+            lambda df1, df2: df1.div(df2, axis=0),
+        )
 
         graph6 = pd.concat(
-            [ev_ebit, ev_ebitda, pe_ttm, pe_ttm2],
-            keys=["EV / EBIT (TTM)", "EV / EBITDA (TTM)", "P/E GAAP (TTM)", "P/E GAAP (TTM) 2"],
+            [ev_ebit, ev_ebitda, pe_ttm2],
+            keys=[
+                "EV / EBIT (TTM)",
+                "EV / EBITDA (TTM)",
+                "P/E GAAP (TTM)",
+            ],
             axis=1,
         )
 
@@ -360,6 +370,7 @@ def render_main():
             {
                 "shortform": {"EPS Diluted Before Extra (TTM)": "Diluted EPS"},
                 "show_legend": False,
+                "is_QE": [True],
             },
         ),
         (
@@ -369,6 +380,7 @@ def render_main():
                     "1 Year Dividend Growth Rate": "Div Growth",
                     "Dividend Amount": "Div Amount",
                 },
+                "is_QE": [True, True],
                 "ypercent": [True, False],
             },
         ),
@@ -388,6 +400,7 @@ def render_main():
                 "shortform": {
                     "EV / EBIT (TTM)": "EV/EBIT",
                     "EV / EBITDA (TTM)": "EV/EBITDA",
+                    "P/E GAAP (TTM)": "P/E",
                 }
             },
         ),
@@ -400,6 +413,7 @@ def render_main():
                 },
                 "ypercent": [True, False],
                 "singleaxis": False,
+                "is_QE": [True, True],
             },
         ),
         (
@@ -411,6 +425,7 @@ def render_main():
                     "Return on Assets (TTM)": "RoA",
                 },
                 "ypercent": True,
+                "is_QE": [True, True, True],
             },
         ),
         (
@@ -419,7 +434,8 @@ def render_main():
                 "shortform": {
                     "Total Revenue (TTM)": "Revenue",
                     "Net Income (TTM)": "Income",
-                }
+                },
+                "is_QE": [True, True, True],
             },
         ),
         (
@@ -429,17 +445,18 @@ def render_main():
                     "Weighted Average Diluted Shares Outstanding (TTM)": "WADS Outstanding"
                 },
                 "show_legend": False,
+                "is_QE": [True],
             },
         ),
         (
             get_graph12,
             {
-                "title": "Book Value / Share, Tangible Book Value, Total Debt",
                 "shortform": {
                     "Book Value / Share": "BV/Share",
                     "Tangible Book Value": "Tang BV",
                     "Total Debt": "Debt",
                 },
+                "is_QE": [True, True, True],
             },
         ),
     ]
@@ -496,6 +513,37 @@ def render_main():
         try:
             graph = func(**ticker_data)
             graph = graph[graph.index >= start_date].applymap(custom_round)
+
+            data = copy.deepcopy(data)
+            # probably try to move display and similar logic inside graph or inside api call
+            for i, colname in enumerate(graph):
+                col = graph[colname]
+                missing_quarter_ends = []
+                if "is_QE" in data and data["is_QE"][i]:
+                    idx = pd.to_datetime(col[col.notnull()].index).to_period("Q")
+                    idx = pd.DatetimeIndex(idx.to_timestamp() + pd.offsets.MonthEnd(3))
+                    quarter_ends = pd.date_range(
+                        start=start_date,
+                        end=(pd.to_datetime("today").date() - pd.DateOffset(60)),
+                        freq="QE",
+                    )
+                    missing_quarter_ends = [
+                        date
+                        for date in quarter_ends
+                        if pd.to_datetime(date) not in idx.values
+                    ]
+                if not col.notnull().any():
+                    st.warning(f"Column {colname} is completely empty, will not show.")
+                    graph = graph.drop(columns=[colname])
+                    if "ypercent" in data:
+                        data["ypercent"].pop(i)
+                elif len(missing_quarter_ends) > 0:
+                    with st.expander(
+                        f"Column {colname} is possibly missing data. Click for details."
+                    ):
+                        if len(missing_quarter_ends) > 0:
+                            st.info("Missing Quarter Ends:")
+                            st.write(missing_quarter_ends)
 
             firsts, lasts = [], []
             for col in graph:
@@ -608,9 +656,7 @@ def render_main():
             )
 
         except Exception as e:
-            st.text(
-                f"Graph {data['title']} could not be shown due to the following error:"
-            )
+            st.text(f"Graph could not be shown due to the following error:")
             st.exception(e)
             continue
 
