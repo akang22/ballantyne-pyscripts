@@ -41,7 +41,6 @@ numpy==1.26.4
 openpyxl==3.1.2
 packaging==24.0
 pandas==2.2.2
-patchelf==0.17.2.1
 peewee==3.17.6
 pillow==10.3.0
 platformdirs==4.2.2
