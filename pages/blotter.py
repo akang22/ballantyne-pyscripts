@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 from charts import finapi
 import plotly.graph_objects as go
+from datetime import datetime, timedelta
 
 tickers = [
     "A", "AAPL", "ADBE", "AMAT", "AMZN", "BAC", "BAM", "BN", "BDX", "BLK", 
-    "BNS", "BX", "CM", "CNR", "CP", "DE", "DHI", "DHR", "DIS", "DOL",
+    "BNS", "BX", "CM", "CNR.TO", "CP", "DE", "DHI", "DHR", "DIS", "DOL",
     "EW", "GOOG", "HD", "JPM", "MET", "MNST", "MSFT", "MSI", "NDAQ", "RY",
-    "SHW", "SLF", "TD", "TIH", "TMO", "TSM", "TXN", "TFII", "ULTA", "URI", 
+    "SHW", "SLF", "TD", "TIH.TO", "TMO", "TSM", "TXN", "TFII", "ULTA", "URI", 
     "WCN", "WFG"
 ]
 
@@ -22,6 +23,12 @@ purchase_dates = [
 ]
 
 st.title("Stock Price Return vs. SP500 from Purchase Date")
+date_filter_option = st.selectbox(
+    "Select Date Range:",
+    ["Since Purchase Date", "1 Month", "3 Months", "Year-to-Date", "1 Year"],
+    index=0  # default
+)
+
 input_tickers = st.text_area("Enter Tickers (comma-separated):", value=", ".join(tickers))
 input_dates = st.text_area("Enter Purchase Dates (comma-separated, YYYY-MM-DD):", value=", ".join(purchase_dates))
 
@@ -29,42 +36,48 @@ tickers = [ticker.strip() for ticker in input_tickers.split(",")]
 purchase_dates = [date.strip() for date in input_dates.split(",")]
 
 @st.cache_data
-def plot_price_return_vs_sp500(ticker, purchase_date):
+def plot_price_return_vs_sp500(ticker, purchase_date, start_date_filter):
     try:
-        # change metric to canadian index if its a canadian stock
-        # TODO: display logic (from kang)
-        # TODO: add the year filter at the beginning, kang can u do that for me?
-        # TODO: maybe csv input or better way to rpocess dates / stocks
-
         index_ticker = "XIU.TO" if ticker.endswith(".TO") else "SPY"
         
         ticker_price = finapi.price(ticker)
         index_price = finapi.price(index_ticker)
         
-        start_date = pd.Timestamp(purchase_date)
-        ticker_price.index = pd.to_datetime(ticker_price.index)
-        index_price.index = pd.to_datetime(index_price.index)
+        purchase_date = pd.Timestamp(purchase_date).strftime("%Y-%m-%d")
+        ticker_price.index = pd.to_datetime(ticker_price.index).strftime("%Y-%m-%d")
+        index_price.index = pd.to_datetime(index_price.index).strftime("%Y-%m-%d")
         
-        # get both dates because they have to exist, no searching bS
-        if start_date not in ticker_price.index or start_date not in index_price.index:
-            st.error(f"No data available on {purchase_date} for {ticker} or {index_ticker}.")
+        if purchase_date not in ticker_price.index or purchase_date not in index_price.index:
+            st.error(f"No data available from {purchase_date} for {ticker} or {index_ticker}.")
             return None
         
-        ticker_price = ticker_price.loc[start_date:]
-        index_price = index_price.loc[start_date:]
-        
+        # adjust dates
+        today = datetime.today()
+        if start_date_filter == "1 Month":
+            adjusted_start_date = today - timedelta(days=30)
+        elif start_date_filter == "3 Months":
+            adjusted_start_date = today - timedelta(days=90)
+        elif start_date_filter == "1 Year":
+            adjusted_start_date = today - timedelta(days=365)
+        elif start_date_filter == "Year-to-Date":
+            adjusted_start_date = datetime(today.year, 1, 1)
+        else:  # Since Purchase Date
+            adjusted_start_date = pd.Timestamp(purchase_date)
+
+        ticker_price = ticker_price.loc[adjusted_start_date.strftime("%Y-%m-%d"):]
+        index_price = index_price.loc[adjusted_start_date.strftime("%Y-%m-%d"):]
+
         ticker_return = (ticker_price / ticker_price.iloc[0]) - 1
         index_return = (index_price / index_price.iloc[0]) - 1
         
         returns_df = pd.concat([index_return, ticker_return], axis=1, keys=[index_ticker, ticker])
         
-        # plot
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=returns_df.index, y=returns_df[index_ticker], mode="lines", name=index_ticker))
         fig.add_trace(go.Scatter(x=returns_df.index, y=returns_df[ticker], mode="lines", name=ticker))
         
         fig.update_layout(
-            title=f"{ticker} Price Return vs {index_ticker} from {purchase_date}",
+            title=f"{ticker} Price Return vs {index_ticker} from {adjusted_start_date.strftime('%Y-%m-%d')}",
             xaxis_title="Date",
             yaxis_title="Return",
             hovermode="x unified"
@@ -78,12 +91,9 @@ def plot_price_return_vs_sp500(ticker, purchase_date):
         return None
 
 
-
-
-
 # Iterate through each ticker and purchase date and display the graph
 for ticker, purchase_date in zip(tickers, purchase_dates):
-    st.subheader(f"{ticker} - Purchase Date: {purchase_date}")
-    fig = plot_price_return_vs_sp500(ticker, purchase_date)
+    st.subheader(f"{ticker} Relative Stock Return")
+    fig = plot_price_return_vs_sp500(ticker, purchase_date, date_filter_option)
     if fig:
         st.plotly_chart(fig, use_container_width=True)
