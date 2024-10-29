@@ -27,7 +27,20 @@ def add_date_index(func):
 def price(ticker: str):
     apikey = get_secret(ConfigKey.FMP)
     val = r.get(f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?apikey={apikey}").json()
-    return pd.DataFrame(val['historical']).set_index('date')['close']
+    
+    ret = []
+    i = 0 
+    
+    while len(val.get('historical', [])) > 0:
+        i += 1
+        ret.extend(val['historical'])
+        last_date = datetime.datetime.strptime(val['historical'][-1]['date'], FMP_DATE_FORMAT) - datetime.timedelta(days=1)
+
+        val = r.get(f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}?to={last_date.strftime(FMP_DATE_FORMAT)}&apikey={apikey}").json()
+        if i > 40:
+            break
+
+    return pd.DataFrame(ret).set_index('date')['close']
 
 
 @add_date_index
