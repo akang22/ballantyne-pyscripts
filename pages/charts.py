@@ -219,17 +219,6 @@ def render_main():
 
         ev_ebit = piecewise_op_search(ev, ebit, lambda df1, df2: df1.div(df2, axis=0))
 
-        """
-        pe_ttm = finapi.price_earnings(ticker).rolling(4).mean()
-
-        pe_ttm = piecewise_op_search(
-            pe_ttm, mcap, lambda df1, df2: df1.div(df2, axis=0)
-        )
-        pe_ttm = piecewise_op_search(
-            mcap, pe_ttm, lambda df1, df2: df2.mul(df1, axis=0)
-        )
-        """
-
         pe_ttm2 = piecewise_op_search(
             hprice,
             finapi.eps(ticker).rolling(4).sum(),
