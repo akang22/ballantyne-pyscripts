@@ -1,8 +1,10 @@
+from datetime import datetime, timedelta
+
 import streamlit as st
 import pandas as pd
-from charts import finapi
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+
+from charts import finapi, utils
 
 tickers = [
     "A", "AAPL", "ADBE", "AMAT", "AMZN", "BAC", "BAM", "BN", "BDX", "BLK", 
@@ -73,7 +75,7 @@ def relative_return(ticker, purchase_date, start_date_filter):
         ticker_return = (ticker_price / ticker_price.iloc[0]) - 1
         index_return = (index_price / index_price.iloc[0]) - 1
         
-        returns_df = pd.concat([index_return, ticker_return], axis=1, keys=[index_ticker, ticker])
+        returns_df = pd.concat([index_return, ticker_return], axis=1, keys=[index_ticker, ticker]).map(utils.custom_round)
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=returns_df.index, y=returns_df[index_ticker], mode="lines", name=index_ticker))
@@ -82,6 +84,7 @@ def relative_return(ticker, purchase_date, start_date_filter):
         fig.update_layout(
             title=f"{ticker} Price Return vs {index_ticker} from {adjusted_start_date.strftime('%Y-%m-%d')}",
             xaxis_title="Date",
+            yaxis={"tickformat":".2%"},
             yaxis_title="Return",
             hovermode="x unified"
         )

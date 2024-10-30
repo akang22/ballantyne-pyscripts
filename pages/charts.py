@@ -1,19 +1,14 @@
-import json
 import copy
 import datetime
 import warnings
-import math
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 import operator
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from charts import finapi
-
-import pathlib
+from charts import finapi, utils
 
 
 class NoDividendsException(Exception):
@@ -29,13 +24,6 @@ eng_fmt.ENG_PREFIXES = {
     12: "T",
     15: "Q",
 }
-
-
-def custom_round(x):
-    try:
-        return round(x, 3 - int(math.floor(math.log10(abs(x)))))
-    except:
-        return x
 
 
 def render_main():
@@ -501,7 +489,7 @@ def render_main():
     for func, data in graph_funcs:
         try:
             graph = func(**ticker_data)
-            graph = graph[graph.index >= start_date].applymap(custom_round)
+            graph = graph[graph.index >= start_date].map(utils.custom_round)
 
             data = copy.deepcopy(data)
             # probably try to move display and similar logic inside graph or inside api call
