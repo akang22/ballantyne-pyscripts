@@ -8,7 +8,7 @@ import aml
 
 
 def unidecode_fallback(e):
-    part = e.object[e.start:e.end]
+    part = e.object[e.start : e.end]
     replacement = str(unidecode.unidecode(part) or "?")
     return (replacement, e.start + len(part))
 
