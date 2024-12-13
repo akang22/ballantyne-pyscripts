@@ -45,10 +45,14 @@ def get_dfs():
 
 @streamlit.cache_data
 def get_encode(df):
+    # just use unidecode
+    csv_str = df.to_csv(quoting=csv.QUOTE_NONE, escapechar="\\", index=False)
+    return unidecode.unidecode(csv_str)
+
     # encode pushing issues to unidecode.
-    return df.to_csv(quoting=csv.QUOTE_NONE, escapechar="\\", index=False).encode(
-        "cp1252", errors="unidecode_fallback"
-    )
+    # return csv_str.encode(
+    #    "cp1252", errors="unidecode_fallback"
+    #)
 
 
 people_df, entities_df = get_dfs()
