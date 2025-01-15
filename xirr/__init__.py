@@ -40,37 +40,29 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         parse_dates=["StartDate", "EndDate"],
     )
     config = {
-        "QD": lambda d: (
+        "3Months": lambda d: (
             d[1].replace(month=(((d[1].month - 1) // 3) * 3 + 1), day=1)
             + dateutil.relativedelta.relativedelta(days=-1),
             d[1],
         ),
-        "YD": lambda d: (
-            d[1].replace(month=1, day=1)
-            + dateutil.relativedelta.relativedelta(days=-1),
+        "YTD": lambda d: (
+            max(d[0], d[1].replace(month=1, day=1)
+            + dateutil.relativedelta.relativedelta(days=-1)),
             d[1],
         ),
-        "XIRR-1": lambda d: (
+        "1Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-1),
             d[1],
         ),
-        "XIRR-3": lambda d: (
+        "3Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-3),
             d[1],
         ),
-        "XIRR-5": lambda d: (
+        "5Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-5),
             d[1],
         ),
-        "XIRR-10": lambda d: (
-            d[1] + dateutil.relativedelta.relativedelta(years=-10),
-            d[1],
-        ),
-        "XIRR-INC": lambda d: d,
-        **{
-            row.Name: lambda d: (row.StartDate, row.EndDate)
-            for row in custom_intervals.itertuples()
-        },
+        "INCEPT": lambda d: d,
     }
 
     starting["PortCode"] = starting["PortCode"].astype("str").str.strip()
@@ -149,11 +141,12 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
 
         acc_dict = {}
         for name, get_bounds in config.items():
-            if aend.empty:
+            start_date, end_date = get_bounds((astart["Date"].min(), final_date))
+
+            if aend.empty or (end_date - start_date) < dateutil.relativedelta.relativedelta(days=90):
                 acc_dict[name] = None
                 continue
 
-            start_date, end_date = get_bounds((astart["Date"].min(), final_date))
             if astart["Date"].min() <= start_date and end_date <= final_date:
                 # get rid of the first negative monthend and last positive monthend.
                 def index_or_neg1(x, y):
@@ -190,15 +183,17 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
             else:
                 acc_dict[name] = None
 
+        acc_dict["PeriodEndDate"] = final_date
         ret[account] = acc_dict
 
         val_dict[account] = vals
 
     ret_df = (
         pd.DataFrame(
-            data={k: list(v.values()) for k, v in ret.items()}, index=config.keys()
+            data={k: list(v.values()) for k, v in ret.items()}, index=[*list(config.keys()), 'PeriodEndDate']
         )
     ).transpose()
+
     if return_interim:
         return ret_df, val_dict
     return ret_df
