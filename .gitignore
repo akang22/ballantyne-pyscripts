@@ -1,5 +1,6 @@
 .~lock.test.xlsm#
 venv/
+demofolder/
 __pycache__/
 *.py[cod]
 *$py.class
