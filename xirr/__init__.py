@@ -3,6 +3,7 @@ import dateutil
 
 import pandas as pd
 import pyxirr
+import streamlit as st
 
 
 def expect(cond, message):
@@ -17,7 +18,7 @@ def get_monthend_date(date):
     ) + dateutil.relativedelta.relativedelta(days=-1)
 
 
-def main_func(cashflow_file, monthend_file, starting_file, return_interim=False):
+def main_func(cashflow_file, monthend_file, starting_file, return_interim=False, custom_intervals={}):
     cashflows = pd.read_csv(
         cashflow_file,
         parse_dates=["TRADDATE"],
@@ -30,47 +31,42 @@ def main_func(cashflow_file, monthend_file, starting_file, return_interim=False)
         starting_file,
         parse_dates=["STARTMV_DATE"],
     )
-    return main_func_pds(cashflows, month_end, starting, return_interim=return_interim)
+    return main_func_pds(cashflows, month_end, starting, return_interim=return_interim, custom_intervals=custom_intervals)
 
 
 # TODO: add other options like dates
-def main_func_pds(cashflows, month_end, starting, return_interim=False):
-    custom_intervals = pd.read_csv(
-        pathlib.Path(__file__).parent / "settings" / "intervals.csv",
-        parse_dates=["StartDate", "EndDate"],
-    )
+def main_func_pds(cashflows, month_end, starting, return_interim=False, custom_intervals={}):
     config = {
-        "QD": lambda d: (
+        "3Months": lambda d: (
             d[1].replace(month=(((d[1].month - 1) // 3) * 3 + 1), day=1)
             + dateutil.relativedelta.relativedelta(days=-1),
             d[1],
         ),
-        "YD": lambda d: (
+        "YTD": lambda d: (
             d[1].replace(month=1, day=1)
             + dateutil.relativedelta.relativedelta(days=-1),
             d[1],
         ),
-        "XIRR-1": lambda d: (
+        "1Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-1),
             d[1],
         ),
-        "XIRR-3": lambda d: (
+        "3Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-3),
             d[1],
         ),
-        "XIRR-5": lambda d: (
+        "5Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-5),
             d[1],
         ),
-        "XIRR-10": lambda d: (
+        "10Year": lambda d: (
             d[1] + dateutil.relativedelta.relativedelta(years=-10),
             d[1],
         ),
-        "XIRR-INC": lambda d: d,
-        **{
-            row.Name: lambda d: (row.StartDate, row.EndDate)
-            for row in custom_intervals.itertuples()
-        },
+        "INCEPT": lambda d: d if (d[1].replace(month=(((d[1].month - 1) // 3) * 3 + 1), day=1)
+            + dateutil.relativedelta.relativedelta(days=-1)) > d[1] else (d[1].replace(month=(((d[1].month - 1) // 3) * 3 + 1), day=1)
+            + dateutil.relativedelta.relativedelta(days=-1), d[1]),
+        **custom_intervals
     }
 
     starting["PortCode"] = starting["PortCode"].astype("str").str.strip()
@@ -156,10 +152,28 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
             start_date, end_date = get_bounds((astart["Date"].min(), final_date))
             if astart["Date"].min() <= start_date and end_date <= final_date:
                 # get rid of the first negative monthend and last positive monthend.
-                def index_or_neg1(x, y):
-                    return x.index[y] if len(x.index) > 0 else -1
+                def index_or_def(x, y, d):
+                    return x.index[y] if len(x.index) > 0 else d
 
-                first_index = index_or_neg1(
+                first_index = index_or_def(
+                    vals[
+                        (start_date <= vals["Date"])
+                        & (vals["Value"] <= 0)
+                        & (vals["Type"] == 2)
+                    ],
+                    0,
+                    0
+                )
+                last_index = index_or_def(
+                    vals[
+                        (vals["Date"] >= end_date)
+                        & (vals["Value"] >= 0)
+                        & (vals["Type"] == 2)
+                    ],
+                    -1,
+                    -1,
+                )
+                first_index_old = index_or_neg1(
                     vals[
                         (start_date == vals["Date"])
                         & (vals["Value"] <= 0)
@@ -167,7 +181,7 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
                     ],
                     0,
                 )
-                last_index = index_or_neg1(
+                last_index_old = index_or_neg1(
                     vals[
                         (vals["Date"] == end_date)
                         & (vals["Value"] >= 0)
@@ -175,6 +189,13 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
                     ],
                     -1,
                 )
+
+                if (first_index != first_index_old or last_index != last_index_old) and name != "testing":
+                    print(account, name)
+                    print(start_date, end_date)
+                    print(first_index, last_index)
+                    print(first_index_old, last_index_old)
+                    print(vals)
                 try:
                     val = vals[
                         (vals.index > first_index) & (vals.index < last_index)
