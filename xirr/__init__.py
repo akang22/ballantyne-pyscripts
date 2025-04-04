@@ -143,7 +143,7 @@ def main_func_pds(cashflows, month_end, starting, return_interim=False):
         for name, get_bounds in config.items():
             start_date, end_date = get_bounds((astart["Date"].min(), final_date))
 
-            if aend.empty or (end_date - start_date) < dateutil.relativedelta.relativedelta(days=90):
+            if aend.empty or end_date < start_date + dateutil.relativedelta.relativedelta(days=90):
                 acc_dict[name] = None
                 continue
 
