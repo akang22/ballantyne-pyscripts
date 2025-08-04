@@ -94,7 +94,7 @@ def get_consolidated_sanctions_names(xml):
     def split_name(line):
         return (
             [f"{line['GivenName']} {line['LastName'].upper()}"]
-            if "GivenName" in line and "LastName" in line
+            if "GivenName" in line and "LastName" in line and line['LastName'] is not None
             else []
         )
 
