@@ -52,3 +52,4 @@ unidecode
 pyxirr
 requests_cache
 yfinance
+xmltodict
